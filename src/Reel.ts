@@ -71,7 +71,7 @@ export class Reel {
       const prevY = s.y;
       const relativePos = ((this.position + j) % this.symbols.length);
       const newY = (relativePos - 1) * symbolHeight;
-      s.y = newY;
+      s.y = Math.round(newY);
       
       if (newY < prevY && relativePos < 1) {
         s.texture = this.randomTexture();

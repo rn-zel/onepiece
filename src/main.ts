@@ -17,7 +17,7 @@ import { Starfield } from './Starfield';
     document.body.appendChild(app.canvas);
 
     //  Load standard assets
-    await Assets.load([...ASSETS.TEXTURES, ...ASSETS.UI, ...ASSETS.VIDEOS]);
+    await Assets.load([...ASSETS.TEXTURES, ...ASSETS.UI, ...ASSETS.SPRITE_SHEET]);
     
    
     // INITIALIZE STARFIELD 

@@ -1,42 +1,56 @@
 
 
 export const CONFIG = {
-    REEL_OFFSET_X: 0,      
-    REEL_OFFSET_Y: -30,    
+    BACKGROUND_OFFSET_X: 150, 
+    REEL_OFFSET_X: 145,      
+    REEL_OFFSET_Y:-20,    
     
-    CARD_WIDTH: 290,       
-    CARD_HEIGHT: 600,      
-    SYMBOL_SIZE: 170,      
-    SYMBOL_SPACING: 30,    
-    CARD_SPACING: 20,      
-    SYMBOL_MARGIN: 20,
+    CARD_WIDTH: 370,       
+    CARD_HEIGHT: 900,      
+    SYMBOL_SIZE: 280,      
+    SYMBOL_SPACING:15,    
+    CARD_SPACING: 15,      
+    SYMBOL_MARGIN: 10,
+    
+    REELS_COUNT: 5,
+    MACHINE_SCALE: .8,
 
-    CONSOLE_Y: 390,     
+    MASK_PX: 30,
+    MASK_PY: 25,
+    MASK_OFFSET_Y: -15,
+
+    CONSOLE_Y: 490,     
     SPIN_BTN_SIZE: 0.3,
 
     // UI Buttons
     BTN_SPIN_X: 0,
-    BTN_SPIN_Y: 790,
+    BTN_SPIN_Y: 590,
     BTN_AUTO_X: -367,       
-    BTN_AUTO_Y: 700,
-    BTN_MENU_X: 845,    
+    BTN_AUTO_Y: 590,
+    BTN_MENU_X: 845,   
+    BTN_MENU_Y: 590,    
     BTN_MINUS_X: -758,
-    BTN_MINUS_Y: 395,     
+    BTN_MINUS_Y: 595,     
     BTN_PLUS_X: -570,
-    BTN_PLUS_Y: 395,     
+    BTN_PLUS_Y: 595,     
     
     // Text Positions
     TEXT_TOTALWIN_X: 250,
-    TEXT_BET_X: -710,      
-    TEXT_BAL_X: 550,      
+    TEXT_TOTALWIN_Y: 595,
+    TEXT_BET_X: -710,     
+    TEXT_BET_Y: 595,
+    TEXT_BAL_X: 550,  
+    TEXT_BAL_Y: 595,
+
+    // model
+    MODEL_LEFT_X: -520,
+    MODEL_LEFT_Y: 0,
+    MODEL_SCALE: 0.5,
 };
 
 export const PAYOUTS = {
-
-    MACHINE_SCALE: .7,
-
-    CURRENT_BALANCE: 1000,
-    BET_AMMOUNT: 100,
+    CURRENT_BALANCE: 2000,
+    BET_AMOUNT: 100,
 
 
     LOW: .5,   
@@ -44,7 +58,7 @@ export const PAYOUTS = {
     WILD: 10,
 
     SCATTER_SPINS: 5,
-    SCATTER_REQ: 4,
+    SCATTER_REQ: 3,
     SCATTER_EXTRA: 3,
 
     MULTI_4: 3,   
@@ -84,12 +98,15 @@ export const PAYLINES = [
 
 export const ASSETS = {
     TEXTURES: [
-        "moon.png", "comet.png", "meteor.png", "ice.png", "const.png", 
-        "sun.png", "galaxy.png", "black.png",                  
-        "wild.png", "scatter.png"                                
+        "l1.png", "l2.png", "l3.png", "l4.png", "l5.png",
+        "h1.png", "h2.png", "h3.png",
+        "wild.png", "scatter.png"
     ],
-    UI: [ "reelsbg.png", "menu.png", "spinBTN.png", "auto.png", "plus.png", "minus.png", "1.png"],
+    UI: ["reelsbg.png", "menu.png", "spinBTN.png", "auto.png", "plus.png", "minus.png", "1.png"],
     
-    VIDEOS: ["galactus.mp4"]
+    GIF: ["model1.gif"],
+
+    SPRITE_SHEET: ["queen.json","drag.json", "ship.json", "dblue.json", "blue.json","ore.json","red.json","green.json",],
+    
 
 };
