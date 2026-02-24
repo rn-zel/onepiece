@@ -1,23 +1,23 @@
 
 
 export const CONFIG = {
-    BACKGROUND_OFFSET_X: 150, 
-    REEL_OFFSET_X: 145,      
+    BACKGROUND_OFFSET_X: 0, 
+    REEL_OFFSET_X: -5,      
     REEL_OFFSET_Y:-20,    
     
     CARD_WIDTH: 370,       
     CARD_HEIGHT: 900,      
     SYMBOL_SIZE: 280,      
-    SYMBOL_SPACING:15,    
-    CARD_SPACING: 15,      
-    SYMBOL_MARGIN: 10,
+    SYMBOL_SPACING:20,    
+    CARD_SPACING: 10,      
+    SYMBOL_MARGIN: 5,
     
     REELS_COUNT: 5,
-    MACHINE_SCALE: .8,
+    MACHINE_SCALE: .85,
 
     MASK_PX: 30,
-    MASK_PY: 25,
-    MASK_OFFSET_Y: -15,
+    MASK_PY: 50,
+    MASK_OFFSET_Y: -20,
 
     CONSOLE_Y: 490,     
     SPIN_BTN_SIZE: 0.3,
@@ -57,7 +57,7 @@ export const PAYOUTS = {
     HIGH: 2, 
     WILD: 10,
 
-    SCATTER_SPINS: 5,
+    SCATTER_SPINS: 10,
     SCATTER_REQ: 3,
     SCATTER_EXTRA: 3,
 
@@ -100,13 +100,20 @@ export const ASSETS = {
     TEXTURES: [
         "l1.png", "l2.png", "l3.png", "l4.png", "l5.png",
         "h1.png", "h2.png", "h3.png",
-        "wild.png", "scatter.png"
+        "wild111.png", "scatter.png"
     ],
-    UI: ["reelsbg.png", "menu.png", "spinBTN.png", "auto.png", "plus.png", "minus.png", "1.png"],
+    UI: ["reelsbg.png", "menu.png", 
+        "spinBTN.png", "auto.png", "plus.png", 
+        "minus.png", "1.png",
+         "vortex.png"],
     
     GIF: ["model1.gif"],
 
-    SPRITE_SHEET: ["queen.json","drag.json", "ship.json", "dblue.json", "blue.json","ore.json","red.json","green.json",],
+    SPRITE_SHEET: ["queen.json",
+        "drag.json", "ship.json", 
+        "dblue.json", "blue.json",
+        "ore.json","red.json","green.json",
+        "wild.json","scat.json"],
     
 
 };

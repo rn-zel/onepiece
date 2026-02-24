@@ -1,35 +1,11 @@
 {
   "frames": {
-    "dblue_1.png": {
+    "scat_1.png": {
       "frame": {
         "x": 0,
-        "y": 0,
-        "w": 704,
-        "h": 698
-      },
-      "rotated": false,
-      "trimmed": false,
-      "spriteSourceSize": {
-        "x": 0,
-        "y": 0,
-        "w": 704,
-        "h": 698
-      },
-      "sourceSize": {
-        "w": 704,
-        "h": 698
-      },
-      "pivot": {
-        "x": 0.5,
-        "y": 0.5
-      }
-    },
-    "dblue_2.png": {
-      "frame": {
-        "x": 704,
         "y": 0,
         "w": 702,
-        "h": 702
+        "h": 709
       },
       "rotated": false,
       "trimmed": false,
@@ -37,23 +13,23 @@
         "x": 0,
         "y": 0,
         "w": 702,
-        "h": 702
+        "h": 709
       },
       "sourceSize": {
         "w": 702,
-        "h": 702
+        "h": 709
       },
       "pivot": {
         "x": 0.5,
         "y": 0.5
       }
     },
-    "dblue_3.png": {
+    "scat_2.png": {
       "frame": {
         "x": 0,
-        "y": 698,
+        "y": 709,
         "w": 702,
-        "h": 702
+        "h": 709
       },
       "rotated": false,
       "trimmed": false,
@@ -61,34 +37,58 @@
         "x": 0,
         "y": 0,
         "w": 702,
-        "h": 702
+        "h": 709
       },
       "sourceSize": {
         "w": 702,
-        "h": 702
+        "h": 709
       },
       "pivot": {
         "x": 0.5,
         "y": 0.5
       }
     },
-    "dblue_4.png": {
+    "scat_4.png": {
       "frame": {
         "x": 702,
-        "y": 702,
-        "w": 702,
-        "h": 702
+        "y": 0,
+        "w": 706,
+        "h": 705
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 702,
+        "w": 706,
+        "h": 705
+      },
+      "sourceSize": {
+        "w": 706,
+        "h": 705
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "scat_3.png": {
+      "frame": {
+        "x": 702,
+        "y": 705,
+        "w": 706,
+        "h": 702
+      },
+      "rotated": true,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 706,
         "h": 702
       },
       "sourceSize": {
-        "w": 702,
+        "w": 706,
         "h": 702
       },
       "pivot": {
@@ -100,11 +100,11 @@
   "meta": {
     "app": "http://free-tex-packer.com",
     "version": "0.6.7",
-    "image": "dblue.png",
+    "image": "scat.png",
     "format": "RGBA8888",
     "size": {
-      "w": 1406,
-      "h": 1404
+      "w": 1408,
+      "h": 1418
     },
     "scale": 1
   }

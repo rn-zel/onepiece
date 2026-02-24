@@ -3,6 +3,7 @@ import { CONFIG, PAYOUTS, PAYLINES, ASSETS } from "./Config";
 import { Reel } from "./Reel";
 import gsap from "gsap"; 
 import { SymbolAnimator } from "./SymbolAnimator";
+import type { Starfield } from "./Starfield";
 
 export class SlotMachine {
   app: Application;
@@ -42,6 +43,14 @@ export class SlotMachine {
   autoSpinActive: boolean = false;
   autoSpinCount: number = 0;
 
+  blackHole!: Sprite;
+  isFreeSpinsTheme: boolean = false;
+  freeSpinBorder!: Graphics;
+  lightningOverlay!: Graphics;
+  borderTween: any;
+  starfield!: Starfield;
+
+
   constructor(app: Application, textures: Texture[], bgTexture: Texture) {
     this.app = app;
     this.slotTextures = textures;
@@ -57,7 +66,7 @@ export class SlotMachine {
     this.createUI();
     this.setupBetInput(); 
     
-    
+    this.setupBlackHole();
     // this.setupTopCharacter();
 
     this.handleResize();
@@ -71,51 +80,70 @@ export class SlotMachine {
 
     bg.anchor.set(0.5);
     bg.width = 1920 + (padding * 2);
-    bg.height = 1080 + (padding );
+    bg.height = 1080 + (padding * 2);
     bg.x = padding + CONFIG.BACKGROUND_OFFSET_X;
-    bg.y = padding;
+    bg.y = padding + 10;
     this.backgroundContainer.addChild(bg);
+
+    //lightning
+    this.lightningOverlay = new Graphics();
+    this.lightningOverlay.rect(-2000, -2000, 4000, 4000); 
+    this.lightningOverlay.fill(0xFF0055); // flash
+    this.lightningOverlay.alpha = 0;      
+    this.backgroundContainer.addChild(this.lightningOverlay);
   }
 
-  private createReels() {
-    const reelCount = CONFIG.REELS_COUNT;
-    const totalWidth = (CONFIG.CARD_WIDTH * reelCount) + (CONFIG.CARD_SPACING * (reelCount - 1));
-    this.reelContainer.pivot.x = totalWidth / 2;
-    this.reelContainer.pivot.y = CONFIG.CARD_HEIGHT / 2.2;
-    this.reelContainer.x = CONFIG.REEL_OFFSET_X;
-    this.reelContainer.y = CONFIG.REEL_OFFSET_Y; 
-    this.reelContainer.sortableChildren = true;
+ private createReels() {
+    const reelCount = CONFIG.REELS_COUNT;
+    const totalWidth = (CONFIG.CARD_WIDTH * reelCount) + (CONFIG.CARD_SPACING * (reelCount - 1));
+    this.reelContainer.pivot.x = totalWidth / 2;
+    this.reelContainer.pivot.y = CONFIG.CARD_HEIGHT / 2.2;
+    this.reelContainer.x = CONFIG.REEL_OFFSET_X;
+    this.reelContainer.y = CONFIG.REEL_OFFSET_Y; 
+    this.reelContainer.sortableChildren = true;
+    this.freeSpinBorder = new Graphics();
+    this.freeSpinBorder.alpha = 0; 
+    this.mainContainer.addChild(this.freeSpinBorder);
 
+    //   mask  reelContainer
+    const mask = new Graphics();
+    const paddingX = CONFIG.MASK_PX; 
+    const paddingY = CONFIG.MASK_PY; 
 
-    // Mask
-    const mask = new Graphics();
-    
-    const paddingX = CONFIG.MASK_PX; 
-    const paddingY = CONFIG.MASK_PY; 
+    mask.rect(
+        -paddingX,
+        -paddingY + CONFIG.MASK_OFFSET_Y,
+        totalWidth + (paddingX * 2),
+        CONFIG.CARD_HEIGHT + (paddingY * 2)
+    );
+    
+    mask.fill(0xFF0000);
+    
+    this.reelContainer.addChild(mask);
+    this.reelContainer.mask = mask;
 
-    // Draw the rectangle
-    mask.rect(
-        (-totalWidth /2) - paddingX,
-        (-CONFIG.CARD_HEIGHT / 2 + CONFIG.REEL_OFFSET_Y) - paddingY + CONFIG.MASK_OFFSET_Y,
-        totalWidth + (paddingX * 5),
-        CONFIG.CARD_HEIGHT + (paddingY * 4)
-    );
-    
-    mask.fill(0xFF0000);
-    
-    this.mainContainer.addChild(mask);
-    this.reelContainer.mask = mask;
-
-    for (let i = 0; i < reelCount; i++) {
-      const rc = new Container();
-      rc.sortableChildren = true;
-      rc.x = i * (CONFIG.CARD_WIDTH + CONFIG.CARD_SPACING);
-      this.reelContainer.addChild(rc);
-      const reel = new Reel(rc, this.slotTextures, 3, CONFIG.SYMBOL_SIZE, CONFIG.SYMBOL_SPACING, CONFIG.CARD_WIDTH, CONFIG.CARD_HEIGHT);
-      this.reels.push(reel);
-    }
-  }
-
+    for (let i = 0; i < reelCount; i++) {
+      const rc = new Container();
+      rc.sortableChildren = true;
+      rc.x = i * (CONFIG.CARD_WIDTH + CONFIG.CARD_SPACING);
+      this.reelContainer.addChild(rc);
+      const reel = new Reel(rc, this.slotTextures, 3, CONFIG.SYMBOL_SIZE, CONFIG.SYMBOL_SPACING, CONFIG.CARD_WIDTH, CONFIG.CARD_HEIGHT);
+      this.reels.push(reel);
+    }
+    //freespin border
+    this.freeSpinBorder = new Graphics();
+    this.freeSpinBorder.rect(
+       -1910 / 2, 
+        -1050 / 2,
+        1890,      
+        1040       
+    );
+    //   border
+    this.freeSpinBorder.stroke({ color: 0xFF0055, width: 15 }); 
+    this.freeSpinBorder.alpha = 0; 
+    
+    this.mainContainer.addChild(this.freeSpinBorder);
+  }
   private createUI() {
     const glowStyle = new TextStyle({
       fill: 0xffffff,
@@ -201,21 +229,22 @@ export class SlotMachine {
     this.plusButton.on("pointerdown", () => this.adjustBet(10));
     this.uiContainer.addChild(this.plusButton);
 
-    // WinMessage
-    this.winText = new Text("", new TextStyle({
-        fill: 0xffd700,
-        fontSize: 100,
-        fontWeight: "bold",
-        dropShadow: { color: 0x00000, blur: 15, distance: 0 },
-        stroke: { color: 0xF55845, width: 6 },
-        align: "center"
-    }));
+    this.winText = new Text({
+        text: "", 
+        style: {
+            fill: 0xffd700,
+            fontSize: 100,
+            fontWeight: "bold",
+            dropShadow: { color: 0x000000, blur: 15, distance: 0 },
+            align: "center"
+        }
+    });
 
-    this.winText.anchor.set(0.5);
-    this.winText.x = 0; 
-    this.winText.y = 0; 
-    this.winText.resolution = 2;
-    this.uiContainer.addChild(this.winText);
+    this.winText.anchor.set(0.5);
+    this.winText.x = 0; 
+    this.winText.y = 0; 
+    this.winText.resolution = 2;
+    this.uiContainer.addChild(this.winText)
     
     // Bonusspin
     this.bonusSpinsText = new Text("", new TextStyle({
@@ -379,7 +408,7 @@ export class SlotMachine {
     if (this.isEditingBet) this.disableBetEditing();
     const isBonusSpin = this.bonusSpins > 0;
     
-    //  STOP LOGIC 
+    //  STOP  
     if (this.running) {
         this.isQuickSpin = true; 
         this.reels.forEach(r => {
@@ -394,156 +423,189 @@ export class SlotMachine {
     //  Destroy any active Animation
     this.activeAnimations.forEach(anim => {
         gsap.killTweensOf(anim);
+        
+        if (anim.parent) {
+            anim.parent.removeChild(anim);
+        }
+        
         anim.destroy();
     });
-    this.activeAnimations = []; 
+    this.activeAnimations = [];
     
     // reset symbols 
-    this.reels.forEach(r => {
+   this.reels.forEach(r => {
         r.container.zIndex = 0;
-        r.resetBrightness();
+        r.resetBrightness(); 
         r.symbols.forEach(s => {
             gsap.killTweensOf(s);
             gsap.killTweensOf(s.scale);
             s.zIndex = 0;
-            s.scale.set(CONFIG.SYMBOL_SIZE || 0.5); 
             s.alpha = 1;   
             s.rotation = 0;  
         });
     });
     
     //  Update game state 
-    this.running = true;
-    if (isBonusSpin) {
-      this.bonusSpins;
-      this.bonusSpinsText.text = this.bonusSpins > 0 ? `FREE SPINS: ${this.bonusSpins}` : "";
-    } else {
-      this.balance -= this.betAmount;
-      this.balanceText.text = `₱${this.balance}`;
-    }
+   this.running = true;
+    if (isBonusSpin) {
+      this.bonusSpins--; 
+      this.bonusSpinsText.text = this.bonusSpins > 0 ? `FREE SPINS: ${this.bonusSpins}` : "";
+    } else {
+      this.balance -= this.betAmount;
+      this.balanceText.text = `₱${this.balance}`;
+    }
     
     //  UI Updates
     this.spinButton.alpha = 0.6;
     this.winText.text = "";      
 
-    //   spin animations
-    this.reels.forEach((r, i) => {
-      const target = r.position + 20 + i * 2;
-      const time = 2.0 + i * 0.2; 
-      
-      gsap.to(r, {
-          position: target,
-          duration: time,
-          ease: "power2.out", 
-          onUpdate: () => r.updateSymbols(),
-          onComplete: i === this.reels.length - 1 ? () => this.reelsComplete() : undefined
-      });
-    });
+   //  spin animations
+    this.reels.forEach((r, i) => {
+      const target = r.position + 20 + i * 2;
+      const time = 2.0 + i * 0.2; 
+      
+      gsap.to(r, {
+          position: target,
+          duration: time,
+          ease: "power2.out", 
+          onUpdate: () => r.updateSymbols(),
+          onComplete: () => {
+              
+              this.bounceSpecialSymbols(r); 
+              
+              // final reel run  win calculations
+              if (i === this.reels.length - 1) {
+                  this.reelsComplete();
+              }
+          }
+      });
+    });
   }
 
-  private reelsComplete() {
-    this.spinButton.alpha = 1;
-    this.running = false;
-    
-    //  SCATTER LOGIC
-    const scatterCount = this.countScatters();
-    if (scatterCount >= PAYOUTS.SCATTER_REQ) {
-        const extraSpins = (scatterCount - PAYOUTS.SCATTER_REQ) * PAYOUTS.SCATTER_EXTRA;
-        const totalSpins = PAYOUTS.SCATTER_SPINS + extraSpins;
+private reelsComplete() {
+    this.spinButton.alpha = 1;
+    this.running = false;
+    
+    //variables to track swapping themes
+    const scatterCount = this.countScatters();
+    const isEnteringFreeSpins = scatterCount >= 3 && !this.isFreeSpinsTheme;
+    const isExitingFreeSpins = this.isFreeSpinsTheme && this.bonusSpins === 0;
+    
+    //  VORTEX FREE SPINS
+    if (isEnteringFreeSpins) {
+        //  LOCK  MACHINE AND BUTTONS
+        this.running = true; 
+        this.spinButton.interactive = false; 
+        this.spinButton.alpha = 0.5;
+       
+        this.bonusSpins += PAYOUTS.SCATTER_SPINS; 
+        this.bonusSpinsText.text = `FREE SPINS: ${this.bonusSpins}`;
+        
+        // animations scatters
+        this.reels.forEach(r => {
+            for (let row = 0; row < PAYOUTS.SCATTER_REQ; row++) {
+                const sprite = r.getSymbolAtRow(row);
+                if (this.slotTextures.indexOf(sprite.texture) === 9) { 
+                    sprite.zIndex = 100;
+                    r.container.zIndex = 100;
+                    this.animateSymbolToContainer(sprite, r);
+                }
+            }
+        });
 
-        this.bonusSpins += totalSpins;
-        this.bonusSpinsText.text = `FREE SPINS: ${this.bonusSpins}`;
-        
-        if (scatterCount > 5){
-          this.winText.text = `MEGA BONUS!\n\n${totalSpins} SPINS!`;
-          this.winText.style.fontSize = 100;
-        } else {
-          this.winText.text = `BONUS!\n\n${totalSpins} SPINS!`;
-          this.winText.style.fontSize = 80;
-        }
+        this.winText.text = `MEGA BONUS!\n\n10 SPINS!`;
+        this.winText.style.fontSize = 100;
 
-        // GSAP TEXT BOUNCE ANIMATION
-        this.winText.scale.set(0); 
-        gsap.to(this.winText.scale, { x: 1, y: 1, duration: 1, ease: "elastic.out(1, 0.4)" });
-    } 
+        // Bounce text and then BLACKHOLE
+        this.winText.scale.set(0.01); 
+        gsap.to(this.winText.scale, { 
+            x: 1, y: 1, duration: 3, ease: "elastic.out(1, 0.4)",
+            onComplete: () => {
+                this.playBlackHoleTransition(true); 
+            }
+        });
+    } 
 
-    //  WIN LOGIC
-    const wins = this.checkPaylineWins(); 
-    
-    if(wins.length > 0) {
-        let totalWin = 0;
-        let isJackpot = false;
+    //  WIN LOGIC
+    const wins = this.checkPaylineWins(); 
+    
+    if(wins.length > 0) {
+        let totalWin = 0;
+        let isJackpot = false;
 
-        // Dim all non-winning symbols
-        this.reels.forEach(r => r.symbols.forEach(s => s.tint = 0x555555));
+        this.reels.forEach(r => r.symbols.forEach(s => s.tint = 0x555555));
 
-        wins.forEach(w => {
-            totalWin += w.payout;
-            if (w.isJackpot) isJackpot = true;
-            
-             const line = PAYLINES[w.lineIndex];
-             
-             // LOOP STARTS HERE
-             for(let i = 0; i < w.matchLength; i++) {
-                 const realReelIndex = w.startIndex + i;
-                 const reel = this.reels[realReelIndex]; 
-                 const row = line[realReelIndex];        
-                 
-                 reel.setBrightness(row, 2); 
+        wins.forEach(w => {
+            totalWin += w.payout;
+            if (w.isJackpot) isJackpot = true;
+            
+             const line = PAYLINES[w.lineIndex];
+             for(let i = 0; i < w.matchLength; i++) {
+                 const realReelIndex = w.startIndex + i;
+                 const reel = this.reels[realReelIndex]; 
+                 const row = line[realReelIndex];        
+                 
+                 reel.setBrightness(row, 2); 
 
-                 const symbolSprite = reel.getSymbolAtRow(row); 
-                 if (symbolSprite) {
-                     
-                     symbolSprite.zIndex = 100;    
-                     reel.container.zIndex = 100;  
+                 const symbolSprite = reel.getSymbolAtRow(row); 
+                 if (symbolSprite) {
+                     symbolSprite.zIndex = 100;    
+                     reel.container.zIndex = 100;  
+                     this.animateSymbolToContainer(symbolSprite, reel);
+                 }
+             }
+         });
+         
+        this.balance += totalWin;
+        this.sessionWins += totalWin;
+        this.balanceText.text = `₱${this.balance}`;
+        this.totalWinText.text = `₱${this.sessionWins}`;
+        
+        // MEGABONUS
+        if (!isEnteringFreeSpins && scatterCount < 5) {
+            if (isJackpot) {
+                 this.winText.text = "JACKPOT!!!";
+                 this.winText.style.fill = 0xff0000; 
+            } else {
+                 this.winText.text = `WIN ₱${totalWin}`;
+                 this.winText.style.fill = 0xffd700; 
+            }
+            
+            // GSAP TEXT BOUNCE ANIMATION
+            this.winText.scale.set(.7); 
+            gsap.to(this.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+        }
+    }
 
-//                      const delaySpeed = this.isQuickSpin ? 1 : 1;
-//                     //  const animationDelay = i * 0.3; 
-//                      const animationDelay = Math.random() * delaySpeed; 
-//                   
-                    const animationDelay = 0;
-                     
-                    gsap.delayedCall(animationDelay, () => {
-                        if (symbolSprite) {
-                        this.animateSymbolToContainer(symbolSprite, reel);
-                        } else {
-                          console.warn("Symbol sprite not found!");
-                          return;
-                     }
-                   });
-                 }
-             }
-            
-             
-        });
+    //  VORTEX OUT 
+    if (isExitingFreeSpins) {
+        
+        //  LOCK MACHINE AND BUTTONS!
+        this.running = true; 
+        this.spinButton.interactive = false; 
+        this.spinButton.alpha = 0.5;
 
-        this.balance += totalWin;
-        this.sessionWins += totalWin;
-        this.balanceText.text = `₱${this.balance}`;
-        this.totalWinText.text = `₱${this.sessionWins}`;
-        
-        if (scatterCount < 5) {
-            if (isJackpot) {
-                 this.winText.text = "JACKPOT!!!";
-                 this.winText.style.fill = 0xff0000; 
-            } else {
-                 this.winText.text = `WIN ₱${totalWin}`;
-                 this.winText.style.fill = 0xffd700; 
-            }
-            
-            // GSAP TEXT BOUNCE ANIMATION
-            this.winText.scale.set(.7); 
-            gsap.to(this.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
-        }
-    }
+        this.winText.text = `TOTAL WIN\n₱${this.sessionWins}`; 
+        this.winText.style.fill = 0x00FF00;
+        this.winText.scale.set(0.01); 
+        
+        
+        gsap.to(this.winText.scale, { 
+            x: 1, y: 1, duration: 3, ease: "back.out(1)",
+            onComplete: () => {
+                this.sessionWins = 0;
+                this.playBlackHoleTransition(false); 
+            }
+        });
+    }
 
-    // AUTO SPIN LOGIC 
-    if(this.autoSpinActive){
-        setTimeout(() => {
-            this.autoSpinNext();
-        }, PAYOUTS.AUTO_SPIN_DELAY);
-    }
-  }
+    // AUTOSPIN  
+    if(this.autoSpinActive && !isEnteringFreeSpins && !isExitingFreeSpins) {
+        setTimeout(() => {
+            this.autoSpinNext();
+        }, PAYOUTS.AUTO_SPIN_DELAY);
+    }
+  }
 
   private getSymbolType(texture: Texture): string {
     const index = this.slotTextures.indexOf(texture);
@@ -648,9 +710,234 @@ export class SlotMachine {
     const symbolIndex = this.slotTextures.indexOf(symbolSprite.texture);
     console.log("Winning symbol index:", symbolIndex);
     
-    // Pass the job entirely off to our new helper class!
+
     SymbolAnimator.play(symbolIndex, symbolSprite, reel, this.activeAnimations, this.isQuickSpin);
 }
 
+private bounceSpecialSymbols(reel: Reel) {
+      for (let row = 0; row < 3; row++) {
+          const sprite = reel.getSymbolAtRow(row);
+          const index = this.slotTextures.indexOf(sprite.texture);
+          
+          // wild || Scatter
+          if (index === 8 || index === 9) {
+              const baseScale = (sprite as any).baseScale || 1;
+              
+              sprite.zIndex = 50; 
+              reel.container.zIndex = 50;
+              
+              // landing bounce
+              gsap.to(sprite.scale, {
+                  x: baseScale * 1.1,
+                  y: baseScale * 1.1,
+                  duration: 0.2,
+                  yoyo: true,
+                  repeat: 1,
+                  delay: 0.1,
+                  ease: "back.out(2)",
+                  onComplete: () => {
+                    sprite.scale.set(baseScale);
+                      sprite.zIndex = 0; 
+                  }
+              });
+          }
+      }
+  }
+
+  private setupBlackHole() {
+      this.blackHole = new Sprite(Assets.get("vortex.png"));
+      this.blackHole.anchor.set(0.5);
+      this.blackHole.scale.set(0); 
+      this.blackHole.zIndex = 999; 
+      
+      
+      this.blackHole.x = window.innerWidth / 2;
+      this.blackHole.y = window.innerHeight / 2;
+      
+      this.app.stage.addChild(this.blackHole);
+  }
+
+ private swapTheme(toFreeSpins: boolean) {
+      this.isFreeSpinsTheme = toFreeSpins;
+      const bgSprite = this.backgroundContainer.children[0] as Sprite;
+      
+      
+      this.reels.forEach(r => {
+          r.isFreeSpins = toFreeSpins;
+          if (toFreeSpins) r.removeScattersInstantly(); 
+      });
+      
+      if (toFreeSpins) {
+          bgSprite.tint = 0xFF0055; 
+          
+          //  ON effect
+          this.toggleFreeSpinEffects(true); 
+      } else {
+          bgSprite.tint = 0xFFFFFF; 
+          
+          // off
+          this.toggleFreeSpinEffects(false); 
+      }
+  }
+
+    private playBlackHoleTransition(toFreeSpins: boolean) {
+      this.running = true; 
+
+      if (this.spinButton) { 
+          this.spinButton.interactive = false; 
+          this.spinButton.alpha = 0.5;        
+      }
+      const targetScale = this.mainContainer.scale.x || CONFIG.MACHINE_SCALE; 
+      
+     const tl = gsap.timeline({
+          onComplete: () => {
+              this.running = false; 
+              this.winText.scale.set(0); 
+              
+              if (this.spinButton) {
+                  this.spinButton.interactive = true; 
+                  this.spinButton.alpha = 1;          
+              }
+              
+              if (toFreeSpins && this.bonusSpins > 0) {
+                  this.startSpin();
+                  
+              } else if (!toFreeSpins && this.autoSpinActive) { 
+                
+                  gsap.delayedCall(1, () => this.startSpin());
+              }
+          }
+      });
+      
+      this.blackHole.x = window.innerWidth / 2;
+      this.blackHole.y = window.innerHeight / 2;
+      this.blackHole.scale.set(0);
+      this.blackHole.rotation = 0;
+
+      tl.to(this.blackHole, { rotation: -Math.PI * 15, duration: 3, ease: "none" }, 0);
+
+      //  Vortex grows 
+      tl.to(this.blackHole.scale, { x: 5, y: 5, duration: 1.5, ease: "power2.out" }, 0);
+
+      //  Machine gets sucked
+      tl.to(this.mainContainer.scale, { x: 0, y: 0, duration: 1, ease: "power2.in" }, 0.5)
+        .to(this.mainContainer, { rotation: Math.PI * 4, duration: 1, ease: "power2.in" }, 0.5);
+
+      // Swap the theme 
+      tl.call(() => {
+          this.swapTheme(toFreeSpins); 
+      }, undefined, 1.5);
+
+      //  Vortex shrinks 
+      tl.to(this.blackHole.scale, { x: 0, y: 0, duration: 1.5, ease: "power2.in" }, 1.5);
+
+      //TNew theme pops
+     // Replace the last part of your tl timeline with this:
+    tl.to(this.mainContainer.scale, { 
+        x: targetScale, 
+        y: targetScale, 
+        duration: 0.8,      
+        ease: "back.out(1.7)" // The (1.7) controls how much it "overshoots"
+    }, 3.0)
+    .to(this.mainContainer, { 
+        rotation: 0, 
+        duration: 0.8, 
+        ease: "power2.out" 
+    }, 3.0);
+    }
+
+  private toggleFreeSpinEffects(enable: boolean) {
+      if (enable) {
+          //  border crackle loop
+          this.freeSpinBorder.alpha = 1;
+          this.animateLightningBorder(); 
+
+          // Start  flashes
+          this.triggerLightning()
+      } else {
+          //kill all effects
+          gsap.killTweensOf(this.animateLightningBorder);
+          gsap.killTweensOf(this.triggerLightning);
+          
+          this.freeSpinBorder.alpha = 0;
+          this.lightningOverlay.alpha = 0;
+      }
+  }
+
+  private triggerLightning() {
+     
+      if (!this.isFreeSpinsTheme) return;
+
+      // flashes
+      gsap.to(this.lightningOverlay, {
+          alpha: 0.4, 
+          duration: 0.05,
+          yoyo: true,
+          repeat: 5, 
+          ease: "none",
+          onComplete: () => {
+              this.lightningOverlay.alpha = 0; 
+              
+              // seconds before striking again
+              gsap.delayedCall(Math.random() * 3 , () => this.triggerLightning());
+          }
+      });
+  }
+
+  private drawLightningLine(g: Graphics, x1: number, y1: number, x2: number, y2: number) {
+      const segments = 55; 
+      g.moveTo(x1, y1);
+      
+      for (let i = 1; i <= segments; i++) {
+          const t = i / segments;
+          
+          //  normal straight point
+          let px = x1 + (x2 - x1) * t;
+          let py = y1 + (y2 - y1) * t;
+          
+          //  add a random jagged offset!
+          if (i !== segments) {
+              const offset = (Math.random() - 0.5) * 60; 
+              const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+              px += Math.cos(angle) * offset;
+              py += Math.sin(angle) * offset;
+          }
+          
+          g.lineTo(px, py);
+      }
+  }
+
+  private updateLightningBorder() {
+    
+      this.freeSpinBorder.clear();
+      
+      const x = -1920 / 2;
+      const y = -1060 / 2;
+      const w = 1890;
+      const h = 1050;
+
+      const numberOfBolts = 20; 
+      
+      for (let i = 0; i < numberOfBolts; i++) {
+          this.drawLightningLine(this.freeSpinBorder, x, y, x + w, y);         
+          this.drawLightningLine(this.freeSpinBorder, x + w, y, x + w, y + h);   
+          this.drawLightningLine(this.freeSpinBorder, x + w, y + h, x, y + h);   
+          this.drawLightningLine(this.freeSpinBorder, x, y + h, x, y);          
+      }       
+      
+      //  STROKES
+      this.freeSpinBorder
+          .stroke({ color: 0xFF0055, width: 3, alpha: 0.3, cap: "round", join: "round" }) 
+    
+  }
+
+  private animateLightningBorder = () => {
+      
+      if (!this.isFreeSpinsTheme) return;
+
+      this.updateLightningBorder();
+      
+      gsap.delayedCall(0.1, this.animateLightningBorder);
+  }
 }
 

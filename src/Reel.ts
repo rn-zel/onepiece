@@ -13,6 +13,7 @@ export class Reel {
   cardWidth: number;
   cardHeight: number;
   symbolContainer: Container;
+  isFreeSpins: boolean = false;
 
   constructor(
     container: Container,
@@ -36,6 +37,32 @@ export class Reel {
     this.container.addChild(this.symbolContainer);
   }
 
+ randomTexture(): Texture {
+    let validTextures = this.slotTextures;
+    
+    // FREE SPIN TRUE - NO SCATTER
+    if (this.isFreeSpins) {
+        validTextures = this.slotTextures.filter((_, index) => index !== 9);
+    }
+    
+    return validTextures[Math.floor(Math.random() * validTextures.length)];
+  }
+
+  removeScattersInstantly() {
+     
+      this.symbols.forEach(s => {
+          if (this.slotTextures.indexOf(s.texture) === 9) { 
+              s.texture = this.randomTexture(); 
+              
+              // Recalculate scale safely
+              const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+              const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
+              s.scale.set(scale);
+              (s as any).baseScale = scale; 
+          }
+      });
+  }
+
   private initSymbols() {
     const totalSymbols = 5; 
     
@@ -54,31 +81,30 @@ export class Reel {
       symbol.x = this.cardWidth / 2; 
       
       (symbol as any).baseScale = scale; 
-
+      (symbol as any).lap = 0; 
+      
       this.symbols.push(symbol);
       this.symbolContainer.addChild(symbol);
     }
   }
 
-  randomTexture(): Texture {
-    return this.slotTextures[Math.floor(Math.random() * this.slotTextures.length)];
-  }
-
   updateSymbols() {
     const symbolHeight = this.symbolSize + this.symbolSpacing;
+    const max = this.symbols.length;
     
     this.symbols.forEach((s, j) => {
-      const prevY = s.y;
-      const relativePos = ((this.position + j) % this.symbols.length);
-      const newY = (relativePos - 1) * symbolHeight;
-      s.y = Math.round(newY);
+      const relativePos = (((this.position + j) % max) + max) % max;
+      s.y = Math.round((relativePos - 1) * symbolHeight);
       
-      if (newY < prevY && relativePos < 1) {
+      const currentLap = Math.floor((this.position + j) / max);
+      
+      if ((s as any).lap !== currentLap) {
         s.texture = this.randomTexture();
         const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
         const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
         s.scale.set(scale);
         (s as any).baseScale = scale; 
+        (s as any).lap = currentLap; 
       }
     });
   }

@@ -5,10 +5,10 @@ interface Star {
     z: number;
     x: number;
     y: number;
+    originalColor: number; // 🚨 Add this to store the random color
 }
 
 export class Starfield {
-    
     public app: Application;
     public container: Container;
     private starAmount: number;
@@ -24,49 +24,36 @@ export class Starfield {
     constructor(app: Application) {
         this.app = app;
         this.container = new Container();
-        
-      
         this.starAmount = 1000;
         this.cameraZ = 0;
         this.fov = 20;
         this.baseSpeed = 0.025;
         this.speed = 1;
-        this.warpSpeed = 25;
+        this.warpSpeed = 0;
         this.starStretch = 5;
         this.starBaseSize = .3;
         this.stars = [];
-
         this.update = this.update.bind(this);
     }
 
     async init() {
-        
         const starTexture = await Assets.load('https://pixijs.com/assets/star.png');
-        
-       const colors = [
-        0xA020F0,
-        0x030512, 
-        0x00D9FF, 
-        0x5E2A9B, 
-        0xB0C4DE, 
-        0xFF8C00,
-        0x0096FF,
-        0xA5F2F3  
-    ];
+        const colors = [0xA020F0, 0x030512, 0x00D9FF, 0x5E2A9B, 0xB0C4DE, 0xFF8C00, 0x0096FF, 0xA5F2F3];
+
         for (let i = 0; i < this.starAmount; i++) {
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
             const star: Star = {
                 sprite: new Sprite(starTexture),
                 z: 0,
                 x: 0,
                 y: 0,
+                originalColor: randomColor // 🚨 Store the random color here
             };
 
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
             star.sprite.tint = randomColor;
             star.sprite.anchor.x = 0.5;
             star.sprite.anchor.y = 0.7;
             this.randomizeStar(star, true);
-            
             this.container.addChild(star.sprite);
             this.stars.push(star);
         }
@@ -78,50 +65,38 @@ export class Starfield {
         this.app.ticker.add(this.update);
     }
 
-   
-    randomizeStar(star: Star, initial?: boolean) {
-        star.z = initial
-            ? Math.random() * 2000
-            : this.cameraZ + Math.random() * 1000 + 2000;
+    // 🚨 NEW METHOD: Call this to swap colors
+    public setTheme(isFreeSpins: boolean) {
+        this.stars.forEach(star => {
+            // If Free Spins, turn Red. Otherwise, return to its stored original color.
+            star.sprite.tint = isFreeSpins ? 0xFF0055 : star.originalColor;
+        });
+    }
 
+    randomizeStar(star: Star, initial?: boolean) {
+        star.z = initial ? Math.random() * 2000 : this.cameraZ + Math.random() * 1000 + 2000;
         const deg = Math.random() * Math.PI * 2;
         const distance = Math.random() * 50 + 1;
-
         star.x = Math.cos(deg) * distance;
         star.y = Math.sin(deg) * distance;
     }
 
-    //  (Pixi.js v8 ticker parameter)
     update(time: Ticker) {
         this.speed += (this.warpSpeed - this.speed) / 20;
         this.cameraZ += time.deltaTime * 10 * (this.speed + this.baseSpeed);
         
         for (let i = 0; i < this.starAmount; i++) {
             const star = this.stars[i];
-
             if (star.z < this.cameraZ) this.randomizeStar(star);
-
             const z = star.z - this.cameraZ;
-
-            star.sprite.x =
-                star.x * (this.fov / z) * this.app.renderer.screen.width +
-                this.app.renderer.screen.width / 2;
-            star.sprite.y =
-                star.y * (this.fov / z) * this.app.renderer.screen.width +
-                this.app.renderer.screen.height / 2;
-
+            star.sprite.x = star.x * (this.fov / z) * this.app.renderer.screen.width + this.app.renderer.screen.width / 2;
+            star.sprite.y = star.y * (this.fov / z) * this.app.renderer.screen.width + this.app.renderer.screen.height / 2;
             const dxCenter = star.sprite.x - this.app.renderer.screen.width / 2;
             const dyCenter = star.sprite.y - this.app.renderer.screen.height / 2;
-            const distanceCenter = Math.sqrt(
-                dxCenter * dxCenter + dyCenter * dyCenter,
-            );
+            const distanceCenter = Math.sqrt(dxCenter * dxCenter + dyCenter * dyCenter);
             const distanceScale = Math.max(0, (2000 - z) / 2000);
-
             star.sprite.scale.x = distanceScale * this.starBaseSize;
-            star.sprite.scale.y =
-                distanceScale * this.starBaseSize +
-                (distanceScale * this.speed * this.starStretch * distanceCenter) /
-                this.app.renderer.screen.width;
+            star.sprite.scale.y = distanceScale * this.starBaseSize + (distanceScale * this.speed * this.starStretch * distanceCenter) / this.app.renderer.screen.width;
             star.sprite.rotation = Math.atan2(dyCenter, dxCenter) + Math.PI / 2;
         }
     }
