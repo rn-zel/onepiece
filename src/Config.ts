@@ -2,45 +2,64 @@
 
 export const CONFIG = {
     BACKGROUND_OFFSET_X: 0, 
-    REEL_OFFSET_X: -5,      
+    REEL_OFFSET_X: -10,      
     REEL_OFFSET_Y:-20,    
     
     CARD_WIDTH: 370,       
-    CARD_HEIGHT: 900,      
-    SYMBOL_SIZE: 280,      
-    SYMBOL_SPACING:20,    
+    CARD_HEIGHT: 910,      
+    SYMBOL_SIZE: 270,      
+    SYMBOL_SPACING: 15,    
     CARD_SPACING: 10,      
-    SYMBOL_MARGIN: 5,
+    SYMBOL_MARGIN: 20,
     
     REELS_COUNT: 5,
-    MACHINE_SCALE: .85,
+    MACHINE_SCALE: .8,
 
     MASK_PX: 30,
-    MASK_PY: 50,
+    MASK_PY: 35,
     MASK_OFFSET_Y: -20,
 
     CONSOLE_Y: 490,     
-    SPIN_BTN_SIZE: 0.3,
+    
 
     // UI Buttons
     BTN_SPIN_X: 0,
-    BTN_SPIN_Y: 590,
-    BTN_AUTO_X: -367,       
-    BTN_AUTO_Y: 590,
-    BTN_MENU_X: 845,   
-    BTN_MENU_Y: 590,    
-    BTN_MINUS_X: -758,
-    BTN_MINUS_Y: 595,     
-    BTN_PLUS_X: -570,
-    BTN_PLUS_Y: 595,     
-    
+    BTN_SPIN_Y: 560,
+    SPIN_BTN_SIZE: 0.5,
+
+    BTN_AUTO_X: -200,       
+    BTN_AUTO_Y: 560,
+    BTN_AUTO_SCALE: 0.5,
+
+    BTN_MENU_X: 893,   
+    BTN_MENU_Y: 578, 
+    BTN_MENU_SCALE: 0.5,
+
+    BTN_MINUS_X: -913,
+    BTN_MINUS_Y: 578,
+    BTN_MINUS_SCALE: 0.5,
+
+    BTN_PLUS_X: -600,
+    BTN_PLUS_Y: 578,     
+    BTN_PLUS_SCALE: 0.5,
     // Text Positions
     TEXT_TOTALWIN_X: 250,
-    TEXT_TOTALWIN_Y: 595,
-    TEXT_BET_X: -710,     
-    TEXT_BET_Y: 595,
+    TEXT_TOTALWIN_Y: 585,
+    TOTALWIN_BG_SCALE: 0.6,
+    TOTALWIN_BG_X: 230,
+    TOTALWIN_BG_Y: 585,
+
+    TEXT_BET_X: -830,     
+    TEXT_BET_Y: 585,
+    BET_BG_SCALE: 0.5,
+    BET_BG_X: -845,
+    BET_BG_Y: 585,
+
     TEXT_BAL_X: 550,  
-    TEXT_BAL_Y: 595,
+    TEXT_BAL_Y: 585,
+    BALANCE_BG_SCALE: 0.6,
+    BALANCE_BG_X: 530,
+    BALANCE_BG_Y: 585,
 
     // model
     MODEL_LEFT_X: -520,
@@ -102,10 +121,10 @@ export const ASSETS = {
         "h1.png", "h2.png", "h3.png",
         "wild111.png", "scatter.png"
     ],
-    UI: ["reelsbg.png", "menu.png", 
-        "spinBTN.png", "auto.png", "plus.png", 
+    UI: ["reelsbg2.png", "menu.png", 
+        "spinBTN.png", "autoSpin.png", "plus.png", 
         "minus.png", "1.png",
-         "vortex.png"],
+         "vortex.png", "bet.png","balance.png","totalwin.png"],
     
     GIF: ["model1.gif"],
 

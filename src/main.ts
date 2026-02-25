@@ -16,11 +16,11 @@ import { Starfield } from './Starfield';
     });
     document.body.appendChild(app.canvas);
 
-    //  Load standard assets
+    //  assets
     await Assets.load([...ASSETS.TEXTURES, ...ASSETS.UI, ...ASSETS.SPRITE_SHEET]);
     
    
-    // INITIALIZE STARFIELD 
+    //STARFIELD 
    
     const starBackground = new Starfield(app);
     
@@ -31,7 +31,7 @@ import { Starfield } from './Starfield';
 
     
     const slotTextures = ASSETS.TEXTURES.map(url => Texture.from(url));
-    const bgTexture = Texture.from("reelsbg.png");
+    const bgTexture = Texture.from("reelsbg2.png");
     
   
     (window as any).slotMachine = new SlotMachine(app, slotTextures, bgTexture);
