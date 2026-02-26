@@ -5,7 +5,7 @@ interface Star {
     z: number;
     x: number;
     y: number;
-    originalColor: number; // 🚨 Add this to store the random color
+    originalColor: number; 
 }
 
 export class Starfield {
@@ -30,8 +30,8 @@ export class Starfield {
         this.baseSpeed = 0.025;
         this.speed = 1;
         this.warpSpeed = 0;
-        this.starStretch = 5;
-        this.starBaseSize = .3;
+        this.starStretch = 10;
+        this.starBaseSize = .2;
         this.stars = [];
         this.update = this.update.bind(this);
     }
@@ -47,7 +47,7 @@ export class Starfield {
                 z: 0,
                 x: 0,
                 y: 0,
-                originalColor: randomColor // 🚨 Store the random color here
+                originalColor: randomColor 
             };
 
             star.sprite.tint = randomColor;
@@ -58,17 +58,15 @@ export class Starfield {
             this.stars.push(star);
         }
 
-        setInterval(() => {
-            this.warpSpeed = this.warpSpeed > 0 ? 0 : 1;
-        }, 5000);
+        // setInterval(() => {
+        //     this.warpSpeed = this.warpSpeed > 0 ? 0 : 1;
+        // }, 5000);
         
         this.app.ticker.add(this.update);
     }
 
-    // 🚨 NEW METHOD: Call this to swap colors
     public setTheme(isFreeSpins: boolean) {
         this.stars.forEach(star => {
-            // If Free Spins, turn Red. Otherwise, return to its stored original color.
             star.sprite.tint = isFreeSpins ? 0xFF0055 : star.originalColor;
         });
     }
@@ -104,5 +102,9 @@ export class Starfield {
     destroy() {
         this.app.ticker.remove(this.update);
         this.container.destroy({ children: true });
+    }
+
+    public triggerWarp(isWarping: boolean) {
+        this.warpSpeed = isWarping ? 1 : 0;
     }
 }

@@ -127,6 +127,7 @@ export const ASSETS = {
          "vortex.png", "bet.png","balance.png","totalwin.png"],
     
     GIF: ["model1.gif"],
+    VIDEO: ["redlight.mp4"],
 
     SPRITE_SHEET: ["queen.json",
         "drag.json", "ship.json", 

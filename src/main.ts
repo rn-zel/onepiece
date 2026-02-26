@@ -34,8 +34,7 @@ import { Starfield } from './Starfield';
     const bgTexture = Texture.from("reelsbg2.png");
     
   
-    (window as any).slotMachine = new SlotMachine(app, slotTextures, bgTexture);
-    
+(window as any).slotMachine = new SlotMachine(app, slotTextures, bgTexture, starBackground);    
   } catch (error) { 
       console.error("Error starting game:", error); 
   }
