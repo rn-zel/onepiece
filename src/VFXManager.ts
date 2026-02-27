@@ -126,7 +126,7 @@ export class VFXManager {
           .to(this.mainContainer.scale, { x: targetScale, y: targetScale, duration: 0.2, ease: "power2.in" }, 3.25)
           .to(this.mainContainer, { rotation: 0, duration: 0.45, ease: "power2.out" }, 3.0);
 
-        // impact sound & shake
+        // impact sound 
         tl.call(() => this.soundManager.playSFX('sfx_impact'), undefined, 3.0);
         tl.call(() => this.soundManager.stopSFX('sfx_vortex'), undefined, 4);
 
@@ -255,7 +255,7 @@ export class VFXManager {
         //  intensity 
         const intensity = 7; 
 
-        //random X and Y 
+        // X and Y 
         const randomX = centerX + (Math.random() * intensity * 2.5 - intensity);
         const randomY = centerY + (Math.random() * intensity * 2 - intensity);
 

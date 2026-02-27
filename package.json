@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@pixi/sound": "^6.0.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "gsap": "^3.14.2",
     "pixi.js": "^8.16.0"
   }

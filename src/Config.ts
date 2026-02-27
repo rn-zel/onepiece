@@ -128,6 +128,7 @@ export const ASSETS = {
     
     GIF: ["model1.gif"],
     VIDEO: ["redlight.mp4"],
+    
 
     SPRITE_SHEET: ["queen.json",
         "drag.json", "ship.json", 
