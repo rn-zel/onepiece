@@ -7,7 +7,7 @@ import { UIManager } from "./UIManager";
 import { VFXManager } from "./VFXManager";
 import { WinManager } from "./WinManager";
 import { SoundManager } from "./Sound";
-import { LightningBorder } from "./LightningBorder";
+import { LightningBorder } from "./animation/LightningBorder";
 import { Starfield } from "./Starfield";
 
 
@@ -538,6 +538,8 @@ export class SlotMachine {
       if (this.lightning.sprite) {
           this.uiManager.container.addChild(this.lightning.sprite);
           this.lightning.sprite.zIndex = 10; 
+
+          this.lightning.sprite.eventMode = "none";
       }
   }
 

@@ -3,7 +3,7 @@ import gsap from "gsap";
 import { CONFIG } from "./Config";
 import type { Reel } from "./Reel";
 import type { SoundManager } from "./Sound";
-import type { LightningBorder } from "./LightningBorder";
+import type { LightningBorder } from "./animation/LightningBorder";
 import { Starfield } from "./Starfield";
 
 export class VFXManager {

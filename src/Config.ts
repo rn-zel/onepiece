@@ -8,8 +8,8 @@ export const CONFIG = {
     CARD_WIDTH: 370,       
     CARD_HEIGHT: 910,      
     SYMBOL_SIZE: 270,      
-    SYMBOL_SPACING: 15,    
-    CARD_SPACING: 10,      
+    SYMBOL_SPACING:20,    
+    CARD_SPACING: 1,      
     SYMBOL_MARGIN: 20,
     
     REELS_COUNT: 5,
@@ -25,11 +25,11 @@ export const CONFIG = {
     // UI Buttons
     BTN_SPIN_X: 0,
     BTN_SPIN_Y: 560,
-    SPIN_BTN_SIZE: 0.5,
+    SPIN_BTN_SIZE: 0.7,
 
-    BTN_AUTO_X: -200,       
+    BTN_AUTO_X: -250,       
     BTN_AUTO_Y: 560,
-    BTN_AUTO_SCALE: 0.5,
+    BTN_AUTO_SCALE: 0.7,
 
     BTN_MENU_X: 893,   
     BTN_MENU_Y: 578, 
@@ -116,12 +116,19 @@ export const PAYLINES = [
 // ];
 
 export const ASSETS = {
+    // TEXTURES: [
+    //     "l1.png", "l2.png", "l3.png", "l4.png", "l5.png",
+    //     "h1.png", "h2.png", "h3.png",
+    //     "wild111.png", "scatter.png"
+    // ],
+
     TEXTURES: [
-        "l1.png", "l2.png", "l3.png", "l4.png", "l5.png",
-        "h1.png", "h2.png", "h3.png",
-        "wild111.png", "scatter.png"
+        "a.png", "k.png", "q.png", "j.png",
+        "s1.png", "s2.png", "s3.png", "s4.png",
+        "wild.png", "scatter.png"
     ],
-    UI: ["reelsbg2.png", "menu.png", 
+    
+    UI: ["border.png", "menu.png", 
         "spinBTN.png", "autoSpin.png", "plus.png", 
         "minus.png", "1.png",
          "vortex.png", "bet.png","balance.png","totalwin.png"],
@@ -130,11 +137,11 @@ export const ASSETS = {
     VIDEO: ["redlight.mp4"],
     
 
-    SPRITE_SHEET: ["queen.json",
-        "drag.json", "ship.json", 
-        "dblue.json", "blue.json",
-        "ore.json","red.json","green.json",
-        "wild.json","scat.json"],
+    // SPRITE_SHEET: ["queen.json",
+    //     "drag.json", "ship.json", 
+    //     "dblue.json", "blue.json",
+    //     "ore.json","red.json","green.json",
+    //     "wild.json","scat.json"],
     
 
 };

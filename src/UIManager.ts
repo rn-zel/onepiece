@@ -118,6 +118,7 @@ export class UIManager {
         this.betAmountText.resolution = 3;
         this.betAmountText.interactive = true; 
         this.betAmountText.cursor = "text";
+        this.betAmountText.eventMode = "static";
         this.betAmountText.on("pointerdown", this.onBetEditClick);
         this.container.addChild(this.betAmountText);
 
@@ -143,6 +144,7 @@ export class UIManager {
         this.minusButton.x = CONFIG.BTN_MINUS_X;
         this.minusButton.y = CONFIG.BTN_MINUS_Y;
         this.minusButton.interactive = true;
+        this.minusButton.eventMode = "static";
         this.minusButton.cursor = "pointer";
         this.minusButton.on("pointerdown", () => this.onBetAdjust(-10));
         this.container.addChild(this.minusButton);
@@ -154,6 +156,7 @@ export class UIManager {
         this.plusButton.x = CONFIG.BTN_PLUS_X;
         this.plusButton.y = CONFIG.BTN_PLUS_Y;
         this.plusButton.interactive = true;
+        this.plusButton.eventMode = "static";
         this.plusButton.cursor = "pointer";
         this.plusButton.on("pointerdown", () => this.onBetAdjust(10));
         this.container.addChild(this.plusButton);
