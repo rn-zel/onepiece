@@ -5,6 +5,7 @@ import type { Reel } from "./Reel";
 import type { SoundManager } from "./Sound";
 import type { LightningBorder } from "./animation/LightningBorder";
 import { Starfield } from "./Starfield";
+import type { WaterBg } from "./animation/WaterBg";
 
 export class VFXManager {
     public isFreeSpinsTheme: boolean = false;
@@ -17,7 +18,8 @@ export class VFXManager {
     private backgroundContainer: Container;
     private soundManager: SoundManager;
     public lightning: LightningBorder;
-    public starfield: Starfield
+    public starfield: Starfield;
+    public waterBg: WaterBg;
 
     constructor(
         app: any, 
@@ -25,7 +27,8 @@ export class VFXManager {
         backgroundContainer: Container,
         soundManager: SoundManager,
         lightning: LightningBorder,
-        starfield: Starfield
+        starfield: Starfield,
+        waterBg: WaterBg
 
     ) {
         this.app = app;
@@ -34,10 +37,12 @@ export class VFXManager {
         this.lightning = lightning;
         this.soundManager = soundManager;
 
+        this.waterBg = waterBg;
         this.freeSpinBorder = new Graphics();
         this.lightningOverlay = new Graphics();
         this.setupLightningOverlay();
         this.starfield = starfield;
+        this.freeSpinBorder = new Graphics();
     }
 
     private setupLightningOverlay() {
@@ -64,9 +69,32 @@ export class VFXManager {
         this.mainContainer.addChild(this.freeSpinBorder);
     }
 
+    // swapTheme(toFreeSpins: boolean, reels: Reel[]) {
+    //     this.isFreeSpinsTheme = toFreeSpins;
+    //     const bgSprite = this.backgroundContainer.children.find(child => child instanceof Sprite) as Sprite;        
+    //     // change music
+    //     this.soundManager.playBGM(toFreeSpins);
+    //     gsap.delayedCall(1.0, () => this.soundManager.playBGM(toFreeSpins));
+        
+    //     reels.forEach(r => {
+    //         r.isFreeSpins = toFreeSpins;
+    //         if (toFreeSpins) r.removeScattersInstantly(); 
+    //     });
+        
+    //     if (toFreeSpins) {
+    //        if (bgSprite) bgSprite.tint = 0xFF0055;
+    //        if (this.starfield) this.starfield.setTheme(true);
+    //         this.toggleFreeSpinEffects(true); 
+    //     } else {
+    //         if (bgSprite) bgSprite.tint = 0xFFFFFF;
+    //         if (this.starfield) this.starfield.setTheme(false);
+    //         this.toggleFreeSpinEffects(false); 
+    //     }
+    // }
+
     swapTheme(toFreeSpins: boolean, reels: Reel[]) {
         this.isFreeSpinsTheme = toFreeSpins;
-        const bgSprite = this.backgroundContainer.children.find(child => child instanceof Sprite) as Sprite;        
+        
         // change music
         this.soundManager.playBGM(toFreeSpins);
         gsap.delayedCall(1.0, () => this.soundManager.playBGM(toFreeSpins));
@@ -77,11 +105,12 @@ export class VFXManager {
         });
         
         if (toFreeSpins) {
-           if (bgSprite) bgSprite.tint = 0xFF0055;
-           if (this.starfield) this.starfield.setTheme(true);
+            if (this.waterBg) this.waterBg.setTheme(true);
+            if (this.starfield) this.starfield.setTheme(true);
             this.toggleFreeSpinEffects(true); 
         } else {
-            if (bgSprite) bgSprite.tint = 0xFFFFFF;
+            
+            if (this.waterBg) this.waterBg.setTheme(false);
             if (this.starfield) this.starfield.setTheme(false);
             this.toggleFreeSpinEffects(false); 
         }

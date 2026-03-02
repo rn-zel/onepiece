@@ -2,17 +2,17 @@ import { Application, Container, Sprite, Texture, Graphics, AnimatedSprite } fro
 import { CONFIG, PAYOUTS, PAYLINES } from "./Config";
 import { Reel } from "./Reel";
 import gsap from "gsap"; 
-import { SymbolAnimator } from "./SymbolAnimator";
 import { UIManager } from "./UIManager";
 import { VFXManager } from "./VFXManager";
 import { WinManager } from "./WinManager";
 import { SoundManager } from "./Sound";
 import { LightningBorder } from "./animation/LightningBorder";
 import { Starfield } from "./Starfield";
+import { WaterBg } from "./animation/WaterBg";
 
+import type { SymbolAnimation } from "./services/SymbolAnimation";
 
 export class SlotMachine {
-    
   app: Application;
   mainContainer = new Container();
   backgroundContainer = new Container();
@@ -41,15 +41,28 @@ export class SlotMachine {
   isEditingBet: boolean = false; 
 
   lightning: LightningBorder = new LightningBorder();
-  
   starfield: Starfield;
 
-  constructor(app: Application, textures: Texture[], bgTexture: Texture, starfield: Starfield) {
+ private symbolAnimator: SymbolAnimation;
+    waterBg: any;
+
+  constructor(
+      app: Application, 
+      textures: Texture[], 
+      bgTexture: Texture, 
+      starfield: Starfield,
+      symbolAnimator: SymbolAnimation,
+      waterBg: WaterBg
+  ) {
     this.app = app;
     this.slotTextures = textures;
     this.backgroundTexture = bgTexture;
-    
     this.starfield = starfield;
+    this.waterBg = waterBg;
+    
+    // Save our injected service!
+    this.symbolAnimator = symbolAnimator;
+
     this.soundManager.init();
     this.soundManager.playBGM(false);
 
@@ -58,11 +71,18 @@ export class SlotMachine {
     this.mainContainer.addChild(this.backgroundContainer);
     this.mainContainer.addChild(this.reelContainer);
 
-    
     this.setupLightning();
     this.winManager = new WinManager(this.slotTextures);
-    this.vfxManager = new VFXManager(this.app, this.mainContainer, this.backgroundContainer, this.soundManager, this.lightning,this.starfield);
-    
+    // this.vfxManager = new VFXManager(this.app, this.mainContainer, this.backgroundContainer, this.soundManager, this.lightning, this.starfield);
+    this.vfxManager = new VFXManager(
+        this.app, 
+        this.mainContainer, 
+        this.backgroundContainer, 
+        this.soundManager, 
+        this.lightning, 
+        this.starfield, 
+        this.waterBg 
+    );
     this.uiManager = new UIManager(
         () => this.startSpin(),
         () => this.startAutoSpin(),
@@ -73,7 +93,6 @@ export class SlotMachine {
     this.mainContainer.addChild(this.uiManager.container);
 
     this.setupBackground();
-  
     this.createReels();
     this.vfxManager.setupBlackHole();
     this.setupBetInput(); 
@@ -84,16 +103,21 @@ export class SlotMachine {
 
     this.handleResize();
     window.addEventListener("resize", () => this.handleResize());
+    this.waterBg.play();
   }
 
-  private setupBackground() {
-    const bg = new Sprite(this.backgroundTexture);
+
+
+private setupBackground() {
     const padding = -10;
-    bg.anchor.set(0.5);
+    const bg = new Sprite(this.backgroundTexture);
+    
+    bg.anchor.set(0.5); 
     bg.width = 1920 + (padding * 2);
     bg.height = 1080 + (padding * 2);
     bg.x = padding + CONFIG.BACKGROUND_OFFSET_X;
     bg.y = padding + 10;
+    
     this.backgroundContainer.addChild(bg);
   }
 
@@ -142,6 +166,19 @@ export class SlotMachine {
     this.mainContainer.scale.set(scale);
     this.mainContainer.x = screenWidth / 2;
     this.mainContainer.y = screenHeight / 2.2;
+
+    if (this.waterBg && this.waterBg.sprite) {
+        this.waterBg.sprite.x = screenWidth / 2;
+        this.waterBg.sprite.y = screenHeight / 2;
+
+        this.waterBg.sprite.width = window.innerWidth;
+        this.waterBg.sprite.height = window.innerHeight;
+        
+        // const bgScaleX = screenWidth / DESIGN_WIDTH;
+        // const bgScaleY = screenHeight / DESIGN_HEIGHT;
+        // this.waterBg.sprite.scale.set(Math.max(bgScaleX, bgScaleY));
+    }
+
   }
 
   private setupBetInput() {
@@ -311,7 +348,7 @@ export class SlotMachine {
       const time = 2.0 + i * 0.2; 
       
       gsap.to(r, {
-          position: target, duration: time, ease: "power2.out", 
+          position: target, duration: time, ease: "power4.out", 
           onUpdate: () => r.updateSymbols(),
           onComplete: () => {
               this.bounceSpecialSymbols(r); 
@@ -344,6 +381,7 @@ export class SlotMachine {
 
             this.soundManager.playSFX('sfx_win');
             this.reels.forEach(r => r.symbols.forEach(s => s.tint = 0x555555));
+            
 
             wins.forEach(w => {
                 totalWin += w.payout;
@@ -365,6 +403,7 @@ export class SlotMachine {
                     }
                 }
             });
+            
             
             this.balance += totalWin;
             this.sessionWins += totalWin;
@@ -506,10 +545,13 @@ export class SlotMachine {
       
   }
 
-  private animateSymbolToContainer(symbolSprite: Sprite, reel: Reel) {
-    const symbolIndex = this.slotTextures.indexOf(symbolSprite.texture);
-    SymbolAnimator.play(symbolIndex, symbolSprite, reel, this.activeAnimations, this.isQuickSpin);
-  }
+  
+
+    private animateSymbolToContainer(symbolSprite: Sprite, reel: Reel) {
+            const symbolIndex = this.slotTextures.indexOf(symbolSprite.texture);
+            
+            this.symbolAnimator.play(symbolIndex, symbolSprite, reel, this.activeAnimations, this.isQuickSpin);
+        }
 
   private bounceSpecialSymbols(reel: Reel) {
       for (let row = 0; row < 3; row++) {

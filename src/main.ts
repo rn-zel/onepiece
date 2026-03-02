@@ -3,7 +3,8 @@ import { Application, Assets, Texture } from "pixi.js";
 import { SlotMachine } from "./SlotMachine";
 import { ASSETS } from "./Config";
 import { Starfield } from './Starfield'; 
-
+import { SymbolAnimator } from "./services/SymbolAnimator"
+import { WaterBg } from "./animation/WaterBg";
 
 (async () => {
   try {
@@ -22,22 +23,23 @@ import { Starfield } from './Starfield';
     ]
     );
     
-   
-    //STARFIELD 
-   
+
+    const animator = new SymbolAnimator();    
+    await animator.init();
+
+    const waterBg = new WaterBg();
+    await waterBg.init();
+    app.stage.addChild(waterBg.sprite); 
+
     const starBackground = new Starfield(app);
-    
-   
     app.stage.addChild(starBackground.container);
-    
     await starBackground.init();
 
-    
     const slotTextures = ASSETS.TEXTURES.map(url => Texture.from(url));
-    const bgTexture = Texture.from("border.png");
+    const bgTexture = Texture.from("border.png"); 
     
-  
-(window as any).slotMachine = new SlotMachine(app, slotTextures, bgTexture, starBackground);    
+    (window as any).slotMachine = new SlotMachine(app, slotTextures, bgTexture, starBackground, animator, waterBg);
+    
   } catch (error) { 
       console.error("Error starting game:", error); 
   }

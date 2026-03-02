@@ -40,7 +40,6 @@ export class Reel {
  randomTexture(): Texture {
     let validTextures = this.slotTextures;
     
-    // FREE SPIN TRUE - NO SCATTER
     if (this.isFreeSpins) {
         validTextures = this.slotTextures.filter((_, index) => index !== 9);
     }

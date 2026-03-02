@@ -38,7 +38,7 @@ export class Starfield {
 
     async init() {
         const starTexture = await Assets.load('https://pixijs.com/assets/star.png');
-        const colors = [0xA020F0, 0x030512, 0x00D9FF, 0x5E2A9B, 0xB0C4DE, 0xFF8C00, 0x0096FF, 0xA5F2F3];
+        const colors = [0xF4C3F5, 0x9756AF, 0xE2CA0F, 0xE74902, 0xB0C4DE, 0xFF8C00, 0xE74902, 0x503B41];
 
         for (let i = 0; i < this.starAmount; i++) {
             const randomColor = colors[Math.floor(Math.random() * colors.length)];
