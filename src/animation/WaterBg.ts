@@ -1,6 +1,6 @@
 // 📁 src/animation/WaterBg.ts
 import { Sprite, Assets } from "pixi.js";
-import bgImagePath from '../assets/download.png'; 
+import bgImagePath from '../assets/321.png'; 
 
 export class WaterBg {
     public sprite!: Sprite;

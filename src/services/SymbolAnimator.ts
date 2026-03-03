@@ -15,8 +15,16 @@ export class SymbolAnimator implements SymbolAnimation {
         const sheetHeight = 4004;
 
         const symbolFrameCounts: Record<number, number> = {
-            0: 4, 1: 4, 2: 4, 3: 4, 4: 4, 
-            5: 4, 6: 4, 7: 4, 8: 4, 9: 4,
+            0: 4,
+            1: 4,
+            2: 4,
+            3: 4,
+            4: 4,
+            5: 4,
+            6: 4,
+            7: 4,
+            8: 4,
+            9: 4,
         };
 
         const framesData: any = {};
@@ -66,10 +74,10 @@ export class SymbolAnimator implements SymbolAnimation {
         await this.masterSpritesheet.parse();
 
         this.isLoaded = true;
-        console.log("✅ Animator Initialized: Gold Borders Cropped!");
+        console.log("SYMBOL ANIMATION LOADED");
 
     } catch (error) {
-        console.error("❌ Failed to load the Symbol Spritesheet!", error);
+        console.error("FAILED TO LOAD SYMBOL ANIMATION", error);
     }
 }
    public play(symbolIndex: number, staticSprite: Sprite, reel: Reel, activeAnimations: AnimatedSprite[], _isQuickSpin: boolean): void {

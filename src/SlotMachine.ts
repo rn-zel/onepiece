@@ -9,6 +9,8 @@ import { SoundManager } from "./Sound";
 import { LightningBorder } from "./animation/LightningBorder";
 import { Starfield } from "./Starfield";
 import { WaterBg } from "./animation/WaterBg";
+import { LeftTopUI } from "./ui/lefttop";
+import { TitleUI } from "./ui/title";
 
 import type { SymbolAnimation } from "./services/SymbolAnimation";
 
@@ -19,6 +21,8 @@ export class SlotMachine {
   reelContainer = new Container();
   
   uiManager!: UIManager;
+  leftTopUI: LeftTopUI;
+  titleUI: TitleUI;
   vfxManager!: VFXManager;
   winManager!: WinManager;
   soundManager: SoundManager = new SoundManager();
@@ -62,7 +66,7 @@ export class SlotMachine {
     
     // Save our injected service!
     this.symbolAnimator = symbolAnimator;
-
+    
     this.soundManager.init();
     this.soundManager.playBGM(false);
 
@@ -91,6 +95,17 @@ export class SlotMachine {
     );
     this.uiManager.container.zIndex = 100;
     this.mainContainer.addChild(this.uiManager.container);
+
+    this.leftTopUI = new LeftTopUI();
+    this.leftTopUI.getContainer().zIndex = 20; 
+    this.titleUI = new TitleUI();
+    this.titleUI.getContainer().zIndex = 15; 
+    this.uiManager.container.addChild(this.leftTopUI.getContainer());
+    this.uiManager.container.addChild(this.titleUI.getContainer());
+    
+    // Ensure UI starts in non-free-spins theme.
+    this.leftTopUI.setTheme(false);
+    this.titleUI.setTheme(false);
 
     this.setupBackground();
     this.createReels();
@@ -156,15 +171,16 @@ private setupBackground() {
   }
 
   handleResize() {
-    const DESIGN_WIDTH = 1920;
-    const DESIGN_HEIGHT = 1080;
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
-    
-    let scale = Math.min(screenWidth / DESIGN_WIDTH, screenHeight / DESIGN_HEIGHT);
+    const offsetX = CONFIG.SLOT_OFFSET_X;
+
+    let scale = Math.min(screenWidth / CONFIG.DESIGN_WIDTH, screenHeight / CONFIG.DESIGN_HEIGHT);
     scale *= CONFIG.MACHINE_SCALE;
     this.mainContainer.scale.set(scale);
-    this.mainContainer.x = screenWidth / 2;
+
+    // this.mainContainer.x = screenWidth / 2;
+    this.mainContainer.x = screenWidth / 2 + offsetX * scale; 
     this.mainContainer.y = screenHeight / 2.2;
 
     if (this.waterBg && this.waterBg.sprite) {
@@ -179,6 +195,7 @@ private setupBackground() {
         // this.waterBg.sprite.scale.set(Math.max(bgScaleX, bgScaleY));
     }
 
+    this.vfxManager.handleResize();
   }
 
   private setupBetInput() {
@@ -466,6 +483,8 @@ private setupBackground() {
                             () => {
                                 this.vfxManager.swapTheme(true, this.reels);
                                 this.uiManager.toggleButtonTheme(true);
+                                this.leftTopUI.setTheme(true);
+                                this.titleUI.setTheme(true);
                             },
                             //  Clean up
                             () => {
@@ -514,6 +533,8 @@ private setupBackground() {
                                 () => {
                                     this.vfxManager.swapTheme(false, this.reels);
                                     this.uiManager.toggleButtonTheme(false);
+                                    this.leftTopUI.setTheme(false);
+                                    this.titleUI.setTheme(false);
                                     this.uiManager.winText.scale.set(0);
                                     this.uiManager.winText.text = "";
                                 },

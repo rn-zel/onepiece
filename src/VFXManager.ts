@@ -57,9 +57,33 @@ export class VFXManager {
         this.blackHole.anchor.set(0.5);
         this.blackHole.scale.set(0); 
         this.blackHole.zIndex = 999; 
-        this.blackHole.x = window.innerWidth / 2;
-        this.blackHole.y = window.innerHeight / 2;
+        this.updateBlackHolePosition();
         this.app.stage.addChild(this.blackHole);
+    }
+
+    /** Updates vortex and other stage-level VFX to match slot position (call on resize). */
+    handleResize() {
+        this.updateBlackHolePosition();
+    }
+
+    /** Same scale/position formula as SlotMachine.handleResize so vortex and slot stay in sync. */
+    private getSlotCenter(): { x: number; y: number; scale: number } {
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        let scale = Math.min(screenWidth / CONFIG.DESIGN_WIDTH, screenHeight / CONFIG.DESIGN_HEIGHT);
+        scale *= CONFIG.MACHINE_SCALE;
+        return {
+            x: screenWidth / 2 + CONFIG.SLOT_OFFSET_X * scale,
+            y: screenHeight / 2.2,
+            scale,
+        };
+    }
+
+    private updateBlackHolePosition() {
+        if (!this.blackHole) return;
+        const { x, y } = this.getSlotCenter();
+        this.blackHole.x = x;
+        this.blackHole.y = y;
     }
 
     setupFreeSpinBorder() {
@@ -116,24 +140,21 @@ export class VFXManager {
         }
     }
 
-     // vortex 
+     // vortex — use same position/scale as SlotMachine.handleResize so slot doesn’t snap to screen center
     playBlackHoleTransition(_toFreeSpins: boolean, onSwapTextCall: () => void, onCompleteCall: () => void) {
        
         this.soundManager.playSFX('sfx_vortex');
         gsap.delayedCall(3.0, () => this.soundManager.playSFX('sfx_vortex'));
 
-        const targetScale = this.mainContainer.scale.x || CONFIG.MACHINE_SCALE;
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2.2;
+        const { x: centerX, y: centerY, scale: targetScale } = this.getSlotCenter();
+        this.blackHole.x = centerX;
+        this.blackHole.y = centerY;
+        this.blackHole.scale.set(0);
+        this.blackHole.rotation = 0;
         
         const tl = gsap.timeline({
             onComplete: onCompleteCall
         });
-        
-        this.blackHole.x = window.innerWidth / 2;
-        this.blackHole.y = window.innerHeight / 2;
-        this.blackHole.scale.set(0);
-        this.blackHole.rotation = 0;
 
         if(_toFreeSpins) {
             this.blackHole.tint = 0xFF246E;
@@ -270,29 +291,25 @@ export class VFXManager {
     }
 
     private triggerRumble() {
+        const { x: centerX, y: centerY } = this.getSlotCenter();
+
         if (!this.isFreeSpinsTheme) {
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2.2;
-            
+            // When not in free spins, always restore to the normal slot position (with offset)
             gsap.to(this.mainContainer, { x: centerX, y: centerY, duration: 0.1 });
             return; 
         }
-
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2.2;
         
         //  intensity 
         const intensity = 7; 
 
-        // X and Y 
+        // X and Y around the offset slot center
         const randomX = centerX + (Math.random() * intensity * 2.5 - intensity);
         const randomY = centerY + (Math.random() * intensity * 2 - intensity);
 
-        
         gsap.to(this.mainContainer, {
             x: randomX,
             y: randomY,
-            duration: 0.03, //vibration speed
+            duration: 0.03, // vibration speed
             ease: "none",
             onComplete: () => this.triggerRumble() 
         });

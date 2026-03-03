@@ -1,6 +1,10 @@
 
 
 export const CONFIG = {
+    DESIGN_WIDTH: 1920,
+    DESIGN_HEIGHT: 1080,
+
+    SLOT_OFFSET_X: 200,
     BACKGROUND_OFFSET_X: 0, 
     REEL_OFFSET_X: -10,      
     REEL_OFFSET_Y:-20,    
@@ -13,7 +17,7 @@ export const CONFIG = {
     SYMBOL_MARGIN: 20,
     
     REELS_COUNT: 5,
-    MACHINE_SCALE: .8,
+    MACHINE_SCALE: .75,
 
     MASK_PX: 30,
     MASK_PY: 35,
@@ -34,6 +38,22 @@ export const CONFIG = {
     BTN_MENU_X: 893,   
     BTN_MENU_Y: 578, 
     BTN_MENU_SCALE: 0.5,
+
+    // Left
+    HAT_X: -1190,
+    HAT_Y: -890,
+    HAT_SCALE: 0.6,
+
+    // Title 
+    TITLE_X: -1485,
+    TITLE_Y: -300,
+    TITLE_SCALE: 0.7,
+    TITLE_SHEET_COLS: 11,
+    TITLE_SHEET_ROWS: 11,
+    TITLE_SHEET_FRAMES: 120,
+    TITLE_MAX_WIDTH: 650,
+    TITLE_MAX_HEIGHT: 980,
+    TITLE_ANIM_SPEED: 0.5,
 
     BTN_MINUS_X: -913,
     BTN_MINUS_Y: 578,
@@ -61,10 +81,16 @@ export const CONFIG = {
     BALANCE_BG_X: 530,
     BALANCE_BG_Y: 585,
 
-    // model
-    MODEL_LEFT_X: -520,
-    MODEL_LEFT_Y: 0,
-    MODEL_SCALE: 0.5,
+    // // model
+    // MODEL_LEFT_X: -520,
+    // MODEL_LEFT_Y: 0,
+    // MODEL_SCALE: 0.5,
+
+    // UI color theme
+    UI_COLORS: {
+        DEFAULT_TINT: 0xFFFFFF,
+        FREE_SPINS_TINT: 0xFFBDD5,
+    },
 };
 
 export const PAYOUTS = {
@@ -128,7 +154,7 @@ export const ASSETS = {
         "wild.png", "scatter.png"
     ],
     
-    UI: ["border.png", "menu.png", 
+UI: ["border.png", "menu.png", "hat.png", "title.png",
         "spinBTN.png", "autoSpin.png", "plus.png", 
         "minus.png", "1.png",
          "vortex.png", "bet.png","balance.png","totalwin.png"],

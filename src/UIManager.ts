@@ -201,7 +201,7 @@ export class UIManager {
     //tint
     public toggleButtonTheme(isFreeSpins: boolean) {
       
-        const tintColor = isFreeSpins ? 0xFFBDD5 : 0xFFFFFF;
+        const tintColor = isFreeSpins ? CONFIG.UI_COLORS.FREE_SPINS_TINT : CONFIG.UI_COLORS.DEFAULT_TINT;
 
         
         if (this.spinButton) this.spinButton.tint = tintColor;
