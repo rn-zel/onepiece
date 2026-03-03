@@ -91,6 +91,12 @@ export const CONFIG = {
         DEFAULT_TINT: 0xFFFFFF,
         FREE_SPINS_TINT: 0xFFBDD5,
     },
+
+    // MODES
+    WIN_MODE: "WAYS_243" as "PAYLINES" | "WAYS_243",
+    // WIN_MODE: "PAYLINES" as "PAYLINES" | "WAYS_243",
+   
+    ENABLE_CASCADING: true,
 };
 
 export const PAYOUTS = {

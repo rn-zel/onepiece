@@ -1,4 +1,4 @@
-import { Application, Container, Sprite, Texture, Graphics, AnimatedSprite } from "pixi.js";
+import { Application, Container, Sprite, Texture, Graphics, AnimatedSprite, Text } from "pixi.js";
 import { CONFIG, PAYOUTS, PAYLINES } from "./Config";
 import { Reel } from "./Reel";
 import gsap from "gsap"; 
@@ -11,6 +11,9 @@ import { Starfield } from "./Starfield";
 import { WaterBg } from "./animation/WaterBg";
 import { LeftTopUI } from "./ui/lefttop";
 import { TitleUI } from "./ui/title";
+import { PaylineWinEvaluator } from "./domain/wins/PaylineWinEvaluator";
+import { Ways243WinEvaluator } from "./domain/wins/Ways243WinEvaluator";
+import { CascadeEngine } from "./domain/wins/CascadeEngine";
 
 import type { SymbolAnimation } from "./services/SymbolAnimation";
 
@@ -37,6 +40,7 @@ export class SlotMachine {
   betAmount: number = PAYOUTS.BET_AMOUNT;
   bonusSpins: number = PAYOUTS.FREE_SPIN_COUNT;
   sessionWins: number = 0;
+  lastSpinWin: number = 0;
   
   running: boolean = false;
   isQuickSpin: boolean = false;
@@ -114,7 +118,7 @@ export class SlotMachine {
 
     // Sync initial UI text
     this.uiManager.updateBetTextDisplay(`₱${this.betAmount}`);
-    this.uiManager.updateTextValues(this.balance, this.sessionWins, this.bonusSpins);
+    this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
 
     this.handleResize();
     window.addEventListener("resize", () => this.handleResize());
@@ -354,8 +358,11 @@ private setupBackground() {
     } else {
       this.balance -= this.betAmount;
     }
+
+    // Reset per-spin win display at spin start.
+    this.lastSpinWin = 0;
     
-    this.uiManager.updateTextValues(this.balance, this.sessionWins, this.bonusSpins);
+    this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
     this.uiManager.spinButton.alpha = 0.6;
     this.uiManager.spinButton.interactive = true; 
     this.uiManager.winText.text = "";      
@@ -387,13 +394,41 @@ private setupBackground() {
         const isExitingFreeSpins = this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
         
         let sequenceDelay = 0; 
-        const wins = this.winManager.checkPaylineWins(this.reels, this.betAmount); 
+        const grid = this.getVisibleGridIndices();
+        const evaluator =
+            CONFIG.WIN_MODE === "WAYS_243" ? new Ways243WinEvaluator() : new PaylineWinEvaluator();
+
+        const evaluation = evaluator.evaluate(grid, this.betAmount);
+
+        const cascadeResult = CONFIG.ENABLE_CASCADING
+            ? new CascadeEngine(
+                evaluator,
+                (reelIndex) => this.randomSymbolIndexForReel(reelIndex),
+                20
+            ).run(grid, this.betAmount)
+            : { steps: [], totalWin: evaluation.totalWin, finalGrid: grid };
+
+        const wins = evaluation.wins;
+        const totalWinAllCascades = CONFIG.ENABLE_CASCADING ? cascadeResult.totalWin : evaluation.totalWin;
         
         
         // NORMAL WINS
         
-        if(wins.length > 0) {
-            let totalWin = 0;
+        // Cascading flow: play step-by-step "break → drop" before counting total win.
+        if (
+            CONFIG.ENABLE_CASCADING &&
+            cascadeResult.steps.length > 0 &&
+            !isEnteringFreeSpins &&
+            !isExitingFreeSpins
+        ) {
+            this.running = true;
+            this.uiManager.spinButton.interactive = false;
+            this.uiManager.spinButton.alpha = 0.6;
+            void this.playCascadeSequence(cascadeResult);
+            return;
+        }
+
+        if(totalWinAllCascades > 0) {
             let isJackpot = false;
 
             this.soundManager.playSFX('sfx_win');
@@ -401,30 +436,40 @@ private setupBackground() {
             
 
             wins.forEach(w => {
-                totalWin += w.payout;
-                if (w.isJackpot) isJackpot = true;
-                
-                const line = PAYLINES[w.lineIndex];
-                for(let i = 0; i < w.matchLength; i++) {
-                    const realReelIndex = w.startIndex + i;
-                    const reel = this.reels[realReelIndex]; 
-                    const row = line[realReelIndex];        
-                    
-                    reel.setBrightness(row, 2); 
+                const meta = (w as any).meta as any;
+                if (meta?.isJackpot) isJackpot = true;
 
-                    const symbolSprite = reel.getSymbolAtRow(row); 
-                    if (symbolSprite) {
-                        symbolSprite.zIndex = 100;    
-                        reel.container.zIndex = 100;  
-                        this.animateSymbolToContainer(symbolSprite, reel);
+                // Highlighting is only meaningful for payline mode.
+                if (CONFIG.WIN_MODE === "PAYLINES" && typeof meta?.lineIndex === "number") {
+                    const line = PAYLINES[meta.lineIndex];
+                    const startIndex = typeof meta?.startIndex === "number" ? meta.startIndex : 0;
+                    for(let i = 0; i < w.matchLength; i++) {
+                        const realReelIndex = startIndex + i;
+                        const reel = this.reels[realReelIndex]; 
+                        const row = line[realReelIndex];        
+                        
+                        reel.setBrightness(row, 2); 
+
+                        const symbolSprite = reel.getSymbolAtRow(row); 
+                        if (symbolSprite) {
+                            symbolSprite.zIndex = 100;    
+                            reel.container.zIndex = 100;  
+                            this.animateSymbolToContainer(symbolSprite, reel);
+                        }
                     }
                 }
             });
             
             
-            this.balance += totalWin;
-            this.sessionWins += totalWin;
-            this.uiManager.updateTextValues(this.balance, this.sessionWins, this.bonusSpins);
+            this.balance += totalWinAllCascades;
+            this.sessionWins += totalWinAllCascades;
+            this.lastSpinWin = totalWinAllCascades;
+            this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+
+            // Apply cascaded final grid immediately (simple, no drop animation yet).
+            if (CONFIG.ENABLE_CASCADING && cascadeResult.steps.length > 0) {
+                this.applyVisibleGridIndices(cascadeResult.finalGrid);
+            }
             
             if (!isEnteringFreeSpins && scatterCount < 5) {
                 this.uiManager.winText.style.fontSize = 100;
@@ -432,12 +477,14 @@ private setupBackground() {
                     this.uiManager.winText.text = "JACKPOT!!!";
                     this.uiManager.winText.style.fill = 0xff0000; 
                 } else {
-                    this.uiManager.winText.text = `WIN ₱${totalWin}`;
+                    this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades)}`;
                     this.uiManager.winText.style.fill = 0xffd700; 
                 }
                 
-                this.uiManager.winText.scale.set(.7); 
-                gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+                    this.uiManager.winText.scale.set(0.01);
+                    gsap.delayedCall(10, () => {
+                        gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+                    });
                 
                 sequenceDelay = 2.0; 
             }
@@ -455,7 +502,8 @@ private setupBackground() {
                 this.soundManager.playSFX('sfx_maxwin'); 
 
                 this.bonusSpins += PAYOUTS.SCATTER_SPINS; 
-                this.uiManager.updateTextValues(this.balance, this.sessionWins, this.bonusSpins);
+                this.lastSpinWin = 0;
+                this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
                 
                 this.reels.forEach(r => {
                     for (let row = 0; row < PAYOUTS.SCATTER_REQ; row++) {
@@ -574,6 +622,43 @@ private setupBackground() {
             this.symbolAnimator.play(symbolIndex, symbolSprite, reel, this.activeAnimations, this.isQuickSpin);
         }
 
+    private getVisibleGridIndices(): number[][] {
+        const grid: number[][] = [];
+        for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
+            const reel = this.reels[reelIndex];
+            const col: number[] = [];
+            for (let row = 0; row < 3; row++) {
+                const sprite = reel.getSymbolAtRow(row);
+                col.push(this.slotTextures.indexOf(sprite.texture));
+            }
+            grid.push(col);
+        }
+        return grid;
+    }
+
+    private applyVisibleGridIndices(grid: number[][]) {
+        for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
+            const reel = this.reels[reelIndex];
+            for (let row = 0; row < 3; row++) {
+                const idx = grid[reelIndex]?.[row];
+                if (typeof idx === "number" && idx >= 0) {
+                    reel.setSymbolIndexAtRow(row, idx);
+                }
+            }
+            reel.resetBrightness();
+        }
+    }
+
+    private randomSymbolIndexForReel(reelIndex: number): number {
+        const reel = this.reels[reelIndex];
+        const indices: number[] = [];
+        for (let i = 0; i < this.slotTextures.length; i++) {
+            if (reel?.isFreeSpins && i === 9) continue; // no scatters during free spins
+            indices.push(i);
+        }
+        return indices[Math.floor(Math.random() * indices.length)];
+    }
+
   private bounceSpecialSymbols(reel: Reel) {
       for (let row = 0; row < 3; row++) {
           const sprite = reel.getSymbolAtRow(row);
@@ -604,6 +689,270 @@ private setupBackground() {
 
           this.lightning.sprite.eventMode = "none";
       }
+  }
+
+  private clearActiveAnimations() {
+      this.activeAnimations.forEach(anim => {
+          gsap.killTweensOf(anim);
+          if (anim.parent) anim.parent.removeChild(anim);
+          anim.destroy();
+      });
+      this.activeAnimations = [];
+  }
+
+  private tweenToEnd(tween: gsap.core.Tween | gsap.core.Timeline) {
+      return new Promise<void>((resolve) => {
+          tween.eventCallback("onComplete", () => resolve());
+      });
+  }
+
+  private async playCascadeSequence(cascadeResult: { steps: any[]; totalWin: number; finalGrid: number[][] }) {
+      
+      this.reels.forEach(r => r.symbols.forEach(s => { s.tint = 0x555555; s.alpha = 1; }));
+
+      let isJackpot = false;
+      const maxAnimatedSymbols = 8;
+
+      for (const step of cascadeResult.steps) {
+          const evaluation = step.evaluation as { wins: any[]; totalWin: number; winningPositions: { reel: number; row: number }[] };
+          if (!evaluation || evaluation.totalWin <= 0) break;
+
+          const beforeGrid = this.getVisibleGridIndices();
+
+          // Detect jackpot in any step 
+          evaluation.wins?.forEach((w: any) => {
+              if (w?.meta?.isJackpot) isJackpot = true;
+          });
+
+          // Highlight + win animations
+          this.reels.forEach(r => r.resetBrightness());
+
+          let animatedCount = 0;
+          for (const p of evaluation.winningPositions) {
+              const reel = this.reels[p.reel];
+              if (!reel) continue;
+              reel.setBrightness(p.row, 2);
+              const sprite = reel.getSymbolAtRow(p.row);
+              sprite.zIndex = 100;
+              reel.container.zIndex = 100;
+              if (animatedCount < maxAnimatedSymbols) {
+                  this.animateSymbolToContainer(sprite, reel);
+                  animatedCount++;
+              }
+          }
+
+          // Show per-symbol win and multiplier for this cascade step
+          const { multiplier } = step as { multiplier: number };
+          const winsInStep = evaluation.wins ?? [];
+
+          for (const win of winsInStep) {
+              const positions = (win.positions ?? []) as { reel: number; row: number }[];
+              if (!positions.length || typeof win.payout !== "number") continue;
+
+              const perSymbolBase = win.payout / positions.length;
+              const perSymbolApplied = perSymbolBase * multiplier;
+
+              for (const pos of positions) {
+                  const reel = this.reels[pos.reel];
+                  if (!reel) continue;
+                  const sprite = reel.getSymbolAtRow(pos.row);
+
+                  const globalPos = sprite.getGlobalPosition();
+                  const localPos = this.uiManager.container.toLocal(globalPos);
+
+                  // WIN value on symbol
+                  const winText = new Text({
+                      text: `₱${Math.floor(perSymbolApplied)}`,
+                      style: {
+                          fill: 0xffd700,
+                          fontSize: 30,
+                          fontWeight: "bold",
+                          stroke: { color: 0x000000, width: 4 },
+                      },
+                  });
+                  winText.anchor.set(0.5);
+                  winText.position.set(localPos.x, localPos.y - 20);
+                  winText.scale.set(0.01);
+                  this.uiManager.container.addChild(winText);
+
+                  gsap.to(winText.scale, {
+                      x: 1,
+                      y: 1,
+                      duration: 1,
+                      ease: "back.out(2)",
+                  });
+                  gsap.to(winText, {
+                      alpha: 0,
+                      duration: 1,
+                      delay: 0.5,
+                      onComplete: () => winText.destroy(),
+                  });
+
+                  // Multiplier text (x2, x3, ...)
+                  const multText = new Text({
+                      text: `x${multiplier}`,
+                      style: {
+                          fill: 0x00ffcc,
+                          fontSize: 24,
+                          fontWeight: "bold",
+                          stroke: { color: 0x000000, width: 4 },
+                      },
+                  });
+                  multText.anchor.set(0.5);
+                  multText.position.set(localPos.x, localPos.y + 5);
+                  multText.scale.set(1);
+                  this.uiManager.container.addChild(multText);
+
+                  gsap.delayedCall(1, () => {
+                      gsap.to(multText.scale, {
+                          x: 1,
+                          y: 1,
+                          duration: 1,
+                          ease: "back.out(2)",
+                      });
+                      gsap.to(multText, {
+                          alpha: 0,
+                          duration: 0.2,
+                          delay: 1,
+                          onComplete: () => multText.destroy(),
+                      });
+                  });
+              }
+          }
+
+          await this.tweenToEnd(gsap.to({}, { duration: 1.5}));
+
+          // Break winning symbols 
+          const breakTweens: gsap.core.Tween[] = [];
+          for (const p of evaluation.winningPositions) {
+              const reel = this.reels[p.reel];
+              if (!reel) continue;
+              const sprite = reel.getSymbolAtRow(p.row);
+              const baseScale = (sprite as any).baseScale || sprite.scale.x || 1;
+              breakTweens.push(gsap.to(sprite, { alpha: 0, duration: 0.25, ease: "power2.out" }));
+              breakTweens.push(gsap.to(sprite.scale, { x: baseScale * 0.8, y: baseScale * 0.8, duration: 0.25, ease: "power2.out" }));
+          }
+          await Promise.all(breakTweens.map(t => this.tweenToEnd(t)));
+
+          // Cleanup 
+          this.clearActiveAnimations();
+          await this.animateCascadeDrop(beforeGrid, step.gridAfterDrop, evaluation.winningPositions);
+
+          // Dim again 
+          this.reels.forEach(r => r.symbols.forEach(s => { s.tint = 0x555555; s.zIndex = 0; s.scale.set((s as any).baseScale || s.scale.x); }));
+      }
+
+      // Count total win at the end of the cascade chain
+      const totalWinAllCascades = cascadeResult.totalWin || 0;
+      if (totalWinAllCascades > 0) {
+          this.balance += totalWinAllCascades;
+          this.sessionWins += totalWinAllCascades;
+          this.lastSpinWin = totalWinAllCascades;
+          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+
+          this.uiManager.winText.style.fontSize = 100;
+          if (isJackpot) {
+              this.uiManager.winText.text = "JACKPOT!!!";
+              this.uiManager.winText.style.fill = 0xff0000;
+          } else {
+              this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades)}`;
+              this.uiManager.winText.style.fill = 0xffd700;
+          }
+          this.uiManager.winText.scale.set(0.01);
+          gsap.delayedCall(0.35, () => {
+              gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+          });
+      }
+
+      // Restore interactivity and continue autos
+      this.running = false;
+      this.uiManager.spinButton.interactive = true;
+      this.uiManager.spinButton.alpha = 1;
+
+      if (this.autoSpinActive) {
+          gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
+      }
+  }
+
+  private setSpriteToSymbolIndex(reel: Reel, sprite: Sprite, symbolIndex: number) {
+      const texture = this.slotTextures[symbolIndex];
+      if (!texture) return;
+
+      sprite.texture = texture;
+      const availableWidth = reel.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+      const scale = Math.min(availableWidth / texture.width, reel.symbolSize / texture.height);
+      sprite.scale.set(scale);
+      (sprite as any).baseScale = scale;
+      sprite.alpha = 1;
+      sprite.rotation = 0;
+  }
+
+  private async animateCascadeDrop(
+      beforeGrid: number[][],
+      afterGrid: number[][],
+      winningPositions: { reel: number; row: number }[]
+  ) {
+      const removedByReel = new Map<number, number[]>();
+      for (const p of winningPositions) {
+          const arr = removedByReel.get(p.reel) ?? [];
+          arr.push(p.row);
+          removedByReel.set(p.reel, arr);
+      }
+      for (const [reelIndex, rows] of removedByReel) {
+          rows.sort((a, b) => a - b);
+          removedByReel.set(reelIndex, Array.from(new Set(rows)));
+      }
+
+      const tweens: gsap.core.Tween[] = [];
+
+      for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
+          const reel = this.reels[reelIndex];
+          const removedRows = removedByReel.get(reelIndex) ?? [];
+          if (removedRows.length === 0) continue;
+
+          const symbolHeight = reel.symbolSize + reel.symbolSpacing;
+          const rowSprites: Sprite[] = [
+              reel.getSymbolAtRow(0),
+              reel.getSymbolAtRow(1),
+              reel.getSymbolAtRow(2),
+          ];
+
+          const keptOldRows = [0, 1, 2].filter((r) => !removedRows.includes(r));
+          const keptValues = keptOldRows.map((r) => beforeGrid[reelIndex][r]);
+          const keptCount = keptValues.length;
+
+          // Map kept symbols to their new rows after compaction
+          for (let k = 0; k < keptCount; k++) {
+              const oldRow = keptOldRows[k];
+              const newRow = 3 - keptCount + k;
+              const sprite = rowSprites[oldRow];
+              const baseScale = (sprite as any).baseScale || sprite.scale.x || 1;
+              sprite.alpha = 1;
+              sprite.scale.set(baseScale);
+              sprite.tint = 0xFFFFFF;
+              tweens.push(
+                  gsap.to(sprite, { y: newRow * symbolHeight, duration: 0.32, ease: "power2.out" })
+              );
+          }
+
+          // Use removed sprites to spawn new symbols above and drop them into empty rows at the top
+          const newRowsCount = 3 - keptCount;
+          for (let newRow = 0; newRow < newRowsCount; newRow++) {
+              const sprite = rowSprites[removedRows[newRow] ?? removedRows[0]];
+              const symbolIndex = afterGrid[reelIndex][newRow];
+              this.setSpriteToSymbolIndex(reel, sprite, symbolIndex);
+              sprite.tint = 0xFFFFFF;
+              sprite.y = -symbolHeight * (newRowsCount - newRow);
+              tweens.push(
+                  gsap.to(sprite, { y: newRow * symbolHeight, duration: 0.38, ease: "power2.out" })
+              );
+          }
+      }
+
+      await Promise.all(tweens.map((t) => this.tweenToEnd(t)));
+
+      // Ensure the final grid indices/textures are correct and snapped to row positions
+      this.applyVisibleGridIndices(afterGrid);
   }
 
    

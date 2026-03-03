@@ -117,6 +117,21 @@ export class Reel {
   getSymbolTexture(row: number): Texture {
     return this.getSymbolAtRow(row).texture;
   }
+
+  setSymbolIndexAtRow(row: number, symbolIndex: number) {
+    const symbol = this.getSymbolAtRow(row);
+    const texture = this.slotTextures[symbolIndex];
+    if (!texture) return;
+
+    symbol.texture = texture;
+
+    const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+    const scale = Math.min(availableWidth / texture.width, this.symbolSize / texture.height);
+    symbol.scale.set(scale);
+    (symbol as any).baseScale = scale;
+
+    symbol.alpha = 1;
+  }
   
   setBrightness(row: number, brightness: number) {
       const symbol = this.getSymbolAtRow(row);
