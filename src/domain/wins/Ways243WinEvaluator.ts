@@ -1,18 +1,19 @@
-import { PAYOUTS } from "../../Config";
+import { PAYOUTS, SYMBOL_BASE } from "../../Config";
 import { isScatter, isWild } from "./symbols";
 import type { Grid, GridPosition, Win, WinEvaluationResult, WinEvaluator, WinMode } from "./types";
 
-function symbolTier(idx: number): "LOW" | "HIGH" | "UNKNOWN" {
-  if (idx >= 0 && idx <= 4) return "LOW";
-  if (idx >= 5 && idx <= 7) return "HIGH";
-  return "UNKNOWN";
+/** True if symbol index is a paying symbol (A,K,Q,J,S1,S2,S3,S4). */
+function isPayingSymbol(idx: number): boolean {
+  return idx >= 0 && idx <= 7;
 }
 
-function payoutForMatchLength(tier: "LOW" | "HIGH", matchLength: number) {
-  const basePay = tier === "HIGH" ? PAYOUTS.HIGH : PAYOUTS.LOW;
-  if (matchLength === 3) return basePay;
-  if (matchLength === 4) return basePay * PAYOUTS.MULTI_4;
-  if (matchLength === 5) return basePay * PAYOUTS.MULTI_5;
+/** Base multiplier for 3-of-a-kind; 4/5 use MULTI_4/MULTI_5. */
+function payoutForMatchLength(symbolIndex: number, matchLength: number): number {
+  const base = SYMBOL_BASE[symbolIndex];
+  if (base == null || base === 0) return 0;
+  if (matchLength === 3) return base;
+  if (matchLength === 4) return base * PAYOUTS.MULTI_4;
+  if (matchLength === 5) return base * PAYOUTS.MULTI_5;
   return 0;
 }
 
@@ -29,10 +30,9 @@ export class Ways243WinEvaluator implements WinEvaluator {
   evaluate(grid: Grid, betAmount: number): WinEvaluationResult {
     const wins: Win[] = [];
 
-    // Evaluate ways for each non-scatter, non-wild base symbol (0..7).
+    // Evaluate ways for each paying symbol (0=A,1=K,2=Q,3=J,4=S1,5=S2,6=S3,7=S4).
     for (let target = 0; target <= 7; target++) {
-      const tier = symbolTier(target);
-      if (tier === "UNKNOWN") continue;
+      if (!isPayingSymbol(target)) continue;
 
       const matchesPerReel: number[] = [];
       let matchLength = 0;
@@ -47,7 +47,7 @@ export class Ways243WinEvaluator implements WinEvaluator {
       if (matchLength < 3) continue;
 
       const waysCount = matchesPerReel.reduce((prod, c) => prod * c, 1);
-      const multiplier = payoutForMatchLength(tier, matchLength);
+      const multiplier = payoutForMatchLength(target, matchLength);
       const payout = betAmount * multiplier * waysCount;
       if (payout <= 0) continue;
 

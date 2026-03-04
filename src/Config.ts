@@ -97,24 +97,28 @@ export const CONFIG = {
     // WIN_MODE: "PAYLINES" as "PAYLINES" | "WAYS_243",
    
     ENABLE_CASCADING: true,
+
+    // Backend
+    USE_BACKEND: true,
+    API_BASE_URL: "http://localhost:3000",
 };
+
+
 
 export const PAYOUTS = {
     CURRENT_BALANCE: 2000,
     BET_AMOUNT: 100,
 
-
-    LOW: .5,   
-    HIGH: 2, 
-    WILD: 10,
+    LOW: 0.25,
+    HIGH: 1.25,
 
     SCATTER_SPINS: 10,
     SCATTER_REQ: 3,
     SCATTER_EXTRA: 3,
 
-    MULTI_4: 3,   
-    MULTI_5: 10,  
-    JACKPOT: 2000, 
+    MULTI_4: 3,
+    MULTI_5: 10,
+    JACKPOT: 2000,
 
     AUTO_SPIN_LIMIT: Number.POSITIVE_INFINITY,
     AUTO_SPIN_DELAY: 1500,
@@ -146,6 +150,13 @@ export const PAYLINES = [
     
 //     [0,0,1,1,2,2,3,4,5,6,7,9,0,1,2,3,4,5,6,7,8]  
 // ];
+
+export const SYMBOL_NAMES = ["A", "K", "Q", "J", "S1", "S2", "S3", "S4"] as const;
+
+export const SYMBOL_BASE: number[] = [
+    0.15, 0.2, 0.25, 0.3,   // A, K, Q, J (low)
+    0.5, 1, 1.5, 2,         // S1, S2, S3, S4 (high)
+];
 
 export const ASSETS = {
     // TEXTURES: [

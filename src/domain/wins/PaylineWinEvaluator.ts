@@ -1,20 +1,19 @@
-import { PAYLINES, PAYOUTS } from "../../Config";
+import { PAYLINES, PAYOUTS, SYMBOL_BASE } from "../../Config";
 import { SYMBOL, isScatter, isWild } from "./symbols";
 import type { Grid, GridPosition, Win, WinEvaluationResult, WinEvaluator, WinMode } from "./types";
 
-function symbolTier(idx: number): "LOW" | "HIGH" | "WILD" | "SCATTER" | "UNKNOWN" {
-  if (idx >= 0 && idx <= 4) return "LOW";
-  if (idx >= 5 && idx <= 7) return "HIGH";
-  if (idx === SYMBOL.WILD) return "WILD";
-  if (idx === SYMBOL.SCATTER) return "SCATTER";
-  return "UNKNOWN";
+/** True if symbol index is a paying symbol (A,K,Q,J,S1,S2,S3,S4). */
+function isPayingSymbol(idx: number): boolean {
+  return idx >= 0 && idx <= 7 && idx !== SYMBOL.WILD && idx !== SYMBOL.SCATTER;
 }
 
-function payoutForMatchLength(tier: "LOW" | "HIGH", matchLength: number) {
-  const basePay = tier === "HIGH" ? PAYOUTS.HIGH : PAYOUTS.LOW;
-  if (matchLength === 3) return basePay;
-  if (matchLength === 4) return basePay * PAYOUTS.MULTI_4;
-  if (matchLength === 5) return basePay * PAYOUTS.MULTI_5;
+/** Base multiplier for 3-of-a-kind; 4/5 use MULTI_4/MULTI_5. */
+function payoutForMatchLength(symbolIndex: number, matchLength: number): number {
+  const base = SYMBOL_BASE[symbolIndex];
+  if (base == null || base === 0) return 0;
+  if (matchLength === 3) return base;
+  if (matchLength === 4) return base * PAYOUTS.MULTI_4;
+  if (matchLength === 5) return base * PAYOUTS.MULTI_5;
   return 0;
 }
 
@@ -34,7 +33,7 @@ export class PaylineWinEvaluator implements WinEvaluator {
         grid[4][line[4]],
       ];
 
-      // Jackpot: 5 consecutive wilds starting from reel 0
+      
       if (
         symbols[0] === SYMBOL.WILD &&
         symbols[1] === SYMBOL.WILD &&
@@ -54,11 +53,11 @@ export class PaylineWinEvaluator implements WinEvaluator {
 
       let bestWinForLine: Win | null = null;
 
-      // Evaluate matches starting from reel 0, 1, or 2
+      // Evaluate matches start reel 0, 1, or 2
       for (let start = 0; start <= 2; start++) {
         let targetIndex = symbols[start];
 
-        // If starting on wild, pick the first non-wild to define the target (if any)
+        // start wild, pick first non-wild to define the target
         if (isWild(targetIndex)) {
           for (let k = start + 1; k < 5; k++) {
             if (!isWild(symbols[k])) {
@@ -78,10 +77,9 @@ export class PaylineWinEvaluator implements WinEvaluator {
 
         if (matchLength < 3) continue;
 
-        const tier = symbolTier(targetIndex);
-        if (tier !== "LOW" && tier !== "HIGH") continue;
+        if (!isPayingSymbol(targetIndex)) continue;
 
-        const multiplier = payoutForMatchLength(tier, matchLength);
+        const multiplier = payoutForMatchLength(targetIndex, matchLength);
         const payout = betAmount * multiplier;
 
         if (!bestWinForLine || payout > bestWinForLine.payout) {

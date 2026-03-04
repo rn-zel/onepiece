@@ -31,27 +31,25 @@ app.get("/", (req, res) => {
 	res.json({ success: true });
 });
 
-// Dummy POST endpoint
+// Dummy POST endpoint – returns balance, jackpot_prizes, and optional free_spin count
 app.post("/load", (req, res) => {
-	//playerBalance = 1200000;
 	const load = structuredClone(loadData[0]);
 
-	//check free spin
 	if (load.data.free_spin != null) {
-		freeSpinCounter = load.data.free_spin.count;
+		load.data.free_spin.count = freeSpinCounter;
+	} else if (freeSpinCounter > 0) {
+		load.data.free_spin = { count: freeSpinCounter };
 	}
-
 	load.data.player.balance = playerBalance;
 	load.data.jackpot_prizes = jackpot_prizes;
-
-	totalFreeWin = loadData.total_win;
 
 	res.json(load);
 });
 
-// Dummy GET endpoint
+// Dummy GET endpoint – use req.body.bet if provided, else totalBet
 app.post("/play", (req, res) => {
-	playerBalance -= totalBet;
+	const bet = typeof req.body?.bet === "number" ? req.body.bet : totalBet;
+	playerBalance -= bet;
 
 	totalFreeWin = 0;
 
@@ -60,9 +58,9 @@ app.post("/play", (req, res) => {
 
 	play.data.balance = playerBalance;
 
-	if (play.data.win > 0) {
-		playerBalance += play.data.win;
-	}
+	const totalWin = play.data.total_win ?? play.data.win ?? 0;
+	if (totalWin > 0) playerBalance += totalWin;
+	if (play.data.total_win == null) play.data.total_win = play.data.win ?? 0;
 
 	if (play.data.free_spin != null) {
 		freeSpinCounter = ADD_FREE;
