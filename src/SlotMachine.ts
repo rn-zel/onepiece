@@ -99,13 +99,14 @@ export class SlotMachine {
     this.uiManager = new UIManager(
         () => this.startSpin(),
         () => this.startAutoSpin(),
+        () => this.openBuyFreeSpinsModal(),
         (amount) => this.adjustBet(amount),
         () => this.enableBetEditing()
     );
     this.uiManager.container.zIndex = 100;
     this.mainContainer.addChild(this.uiManager.container);
 
-    // Domain win evaluation wiring (SOLID: inject shared paytable into evaluators)
+    // Domain win evaluation
     const paytable = new ConfigPaytable();
     this.paylineEvaluator = new PaylineWinEvaluator(paytable);
     this.waysEvaluator = new Ways243WinEvaluator(paytable);
@@ -153,7 +154,220 @@ export class SlotMachine {
     }
   }
 
-  /** Backend mode: call play or play-free-game, then apply result and run cascade/win flow. */
+  private openBuyFreeSpinsModal() {
+    if (this.running) return;
+    if (this.vfxManager.isFreeSpinsTheme) return;
+
+    const cost = this.betAmount * 10;
+    if (!CONFIG.USE_BACKEND && this.balance < cost) return;
+
+    this.uiManager.showBuyFreeSpinsModal(cost, () => {
+      void this.confirmBuyFreeSpins();
+    });
+  }
+
+  private async confirmBuyFreeSpins() {
+    if (this.running) return;
+    if (this.vfxManager.isFreeSpinsTheme) return;
+
+    // Purchased result
+    let purchasedGrid: number[][] | null = null;
+    let purchasedBalance: number | null = null;
+    let purchasedFreeSpins: number | null = null;
+
+    const cost = this.betAmount * 10;
+    if (!CONFIG.USE_BACKEND) {
+      if (this.balance < cost) return;
+      this.balance -= cost;
+      this.bonusSpins += 10;
+      purchasedBalance = this.balance;
+      purchasedFreeSpins = this.bonusSpins;
+      
+      //  Generate a fresh random grid 
+      // the reels look like new outcome.
+      purchasedGrid = [];
+      for (let i = 0; i < this.reels.length; i++) {
+          const col = [];
+          for (let j = 0; j < 3; j++) {
+              col.push(this.randomSymbolIndexForReel(i));
+          }
+          purchasedGrid.push(col);
+      }
+    } else {
+      try {
+        const data = await SlotApi.buyFreeGame(this.betAmount);
+        purchasedBalance = data.balance;
+        purchasedFreeSpins = data.free_spin?.count ?? 0;
+        purchasedGrid = SlotApi.backendReelToGrid(data.slot.reel);
+      } catch (e) {
+        console.error("Buy free spins failed:", e);
+        return;
+      }
+    }
+
+    if (purchasedGrid) this.forceThreeScattersInView(purchasedGrid);
+    if (typeof purchasedBalance === "number") this.balance = purchasedBalance;
+    if (typeof purchasedFreeSpins === "number") this.bonusSpins = purchasedFreeSpins;
+
+
+    this.playOneSpinAnimation(() => {
+      this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+      this.playPurchasedScatterIntro();
+    }, purchasedGrid);
+  }
+
+  private forceThreeScattersInView(grid: number[][]) {
+    // Ensure at least three scatters are visible in the 3x5 window (rows 0–2),
+    // but NEVER replace wilds (index 8). We only turn regular symbols into scatters.
+    const SCATTER_INDEX = 9;
+    const WILD_INDEX = 8;
+
+    let scatterCount = 0;
+    for (let x = 0; x < grid.length; x++) {
+      const col = grid[x];
+      if (!col) continue;
+      for (let y = 0; y < 3; y++) {
+        if (col[y] === SCATTER_INDEX) scatterCount++;
+      }
+    }
+
+    for (let x = 0; x < grid.length && scatterCount < 3; x++) {
+      const col = grid[x];
+      if (!col) continue;
+      for (let y = 0; y < 3 && scatterCount < 3; y++) {
+        if (col[y] === WILD_INDEX) continue; // do not convert wilds into scatters
+        if (col[y] !== SCATTER_INDEX) {
+          col[y] = SCATTER_INDEX;
+          scatterCount++;
+        }
+      }
+    }
+  }
+
+  private playOneSpinAnimation(onDone: () => void, targetGrid?: number[][] | null) {
+    this.soundManager.playSFX("sfx_spin");
+    if (this.starfield) this.starfield.triggerWarp(true);
+
+    gsap.killTweensOf(this.uiManager.spinButton);
+    gsap.fromTo(
+      this.uiManager.spinButton.scale,
+      { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 },
+      { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.4, ease: "back.out(2)" }
+    );
+
+   
+    this.clearActiveAnimations(); 
+
+    this.reels.forEach((r) => {
+      r.container.zIndex = 0;
+      r.resetBrightness();
+      r.symbols.forEach((s) => {
+        gsap.killTweensOf(s);
+        gsap.killTweensOf(s.scale);
+        s.zIndex = 0;
+        s.alpha = 1;
+        s.rotation = 0;
+      });
+    });
+
+    this.running = true;
+    this.lastSpinWin = 0;
+    this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+    this.uiManager.spinButton.alpha = 0.6;
+    this.uiManager.spinButton.interactive = false;
+    this.uiManager.winText.text = "";
+
+    this.reels.forEach((r, i) => {
+      const target = r.position + 20 + i * 2;
+      const time = 2.0 + i * 0.2;
+      
+      let targetApplied = false;
+
+      gsap.to(r, {
+        position: target,
+        duration: time,
+        ease: "power4.out",
+        onUpdate: () => {
+          r.updateSymbols();
+          
+      
+          if (targetGrid && !targetApplied && target - r.position < 2) {
+              targetApplied = true;
+              for (let row = 0; row < 3; row++) {
+                  const idx = targetGrid[i][row];
+                  if (typeof idx === "number" && idx >= 0) {
+                      r.setSymbolIndexAtRow(row, idx);
+                  }
+              }
+          }
+        },
+        onComplete: () => {
+          this.bounceSpecialSymbols(r);
+          if (i === this.reels.length - 1) {
+            if (this.starfield) this.starfield.triggerWarp(false);
+            onDone();
+          }
+        },
+      });
+    });
+  }
+
+  private playPurchasedScatterIntro() {
+    this.uiManager.spinButton.interactive = false;
+    this.uiManager.spinButton.alpha = 0.5;
+
+    gsap.delayedCall(0.2, () => {
+      this.soundManager.playSFX("sfx_maxwin");
+
+      // Animate scatter symbols 
+      this.reels.forEach((r) => {
+        for (let row = 0; row < PAYOUTS.SCATTER_REQ; row++) {
+          const sprite = r.getSymbolAtRow(row);
+          if (this.slotTextures.indexOf(sprite.texture) === 9) {
+            sprite.zIndex = 100;
+            r.container.zIndex = 100;
+            this.animateSymbolToContainer(sprite, r);
+          }
+        }
+      });
+
+      const spinsText = this.bonusSpins > 0 ? `${this.bonusSpins} SPINS!` : "FREE SPINS!";
+      this.uiManager.winText.text = `MEGA BONUS!\n\n${spinsText}`;
+      this.uiManager.winText.style.fontSize = 100;
+      this.uiManager.winText.style.fill = 0xffd700;
+      this.uiManager.winText.scale.set(0.01);
+
+      gsap.to(this.uiManager.winText.scale, {
+        x: 1,
+        y: 1,
+        duration: 2.2,
+        ease: "elastic.out(1, 0.4)",
+        onComplete: () => {
+          this.vfxManager.playBlackHoleTransition(
+            true,
+            () => {
+              this.vfxManager.swapTheme(true, this.reels);
+              this.uiManager.toggleButtonTheme(true);
+              this.leftTopUI.setTheme(true);
+              this.titleUI.setTheme(true);
+              this.reels.forEach((r) => {
+                r.isFreeSpins = true;
+              });
+            },
+            () => {
+              this.running = false;
+              this.uiManager.spinButton.interactive = true;
+              this.uiManager.spinButton.alpha = 1;
+              this.uiManager.winText.text = "";
+              if (this.bonusSpins > 0) this.startSpin();
+            }
+          );
+        },
+      });
+    });
+  }
+
+  /** Backend mode */
   private async spinFromBackend(isBonusSpin: boolean) {
     this.soundManager.playSFX("sfx_spin");
     if (this.starfield) this.starfield.triggerWarp(true);
@@ -281,7 +495,7 @@ export class SlotMachine {
     }
   }
 
-  /** Run cascade animation from backend cascaded steps (same visuals as local cascade). */
+  /** Run cascade animation from backend  */
   private async playCascadeSequenceFromBackend(
     cascaded: BackendCascadeStep[],
     totalWin: number
@@ -417,14 +631,14 @@ private setupBackground() {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
     const offsetX = CONFIG.SLOT_OFFSET_X;
+    const offsetY = CONFIG.SLOT_OFFSET_Y;
 
     let scale = Math.min(screenWidth / CONFIG.DESIGN_WIDTH, screenHeight / CONFIG.DESIGN_HEIGHT);
     scale *= CONFIG.MACHINE_SCALE;
     this.mainContainer.scale.set(scale);
 
-    // this.mainContainer.x = screenWidth / 2;
     this.mainContainer.x = screenWidth / 2 + offsetX * scale; 
-    this.mainContainer.y = screenHeight / 2.2;
+    this.mainContainer.y = screenHeight / 2.2 + offsetY * scale;
 
     if (this.waterBg && this.waterBg.sprite) {
         this.waterBg.sprite.x = screenWidth / 2;

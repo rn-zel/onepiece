@@ -1,4 +1,4 @@
-import { Container, Sprite, Text, TextStyle, Assets } from "pixi.js";
+import { Container, Sprite, Text, TextStyle, Assets, Graphics } from "pixi.js";
 import { CONFIG } from "./Config";
 
 export class UIManager {
@@ -12,6 +12,7 @@ export class UIManager {
     
     spinButton!: Sprite;
     autoSpinButton!: Sprite;
+    buyFreeSpinButton!: Sprite;
     menuButton!: Sprite;
     minusButton!: Sprite;
     plusButton!: Sprite;
@@ -22,8 +23,11 @@ export class UIManager {
     totalWinText!: Text;
     bonusSpinsText!: Text;
 
+    private modalContainer: Container | null = null;
+
     private onSpin: () => void;
     private onAutoSpin: () => void;
+    private onBuyFreeSpins: () => void;
     private onBetAdjust: (amount: number) => void;
     private onBetEditClick: () => void;
     balance: any;
@@ -33,11 +37,13 @@ export class UIManager {
     constructor(
         onSpin: () => void,
         onAutoSpin: () => void,
+        onBuyFreeSpins: () => void,
         onBetAdjust: (amount: number) => void,
         onBetEditClick: () => void
     ) {
         this.onSpin = onSpin;
         this.onAutoSpin = onAutoSpin;
+        this.onBuyFreeSpins = onBuyFreeSpins;
         this.onBetAdjust = onBetAdjust;
         this.onBetEditClick = onBetEditClick;
         this.createUI();
@@ -50,7 +56,8 @@ export class UIManager {
 
         if (this.spinButton) this.spinButton.zIndex = 20;
         if (this.autoSpinButton) this.autoSpinButton.zIndex = 20;
-            }
+        if (this.buyFreeSpinButton) this.buyFreeSpinButton.zIndex = 20;
+    }
 
     private createUI() {
         const glowStyle = new TextStyle({
@@ -58,10 +65,20 @@ export class UIManager {
             dropShadow: { color: 0x00d9ff, blur: 6, distance: 0, angle: 0 }, align: "center"
         });
 
-        // Spin 
+        this.buyFreeSpinButton = new Sprite(Assets.get("freespin.png"));
+        this.buyFreeSpinButton.anchor.set(0.5);
+        this.buyFreeSpinButton.scale.set(CONFIG.BTN_BUY_FREE_SCALE);
+        this.buyFreeSpinButton.x = CONFIG.BTN_RIGHT_COLUMN_X;
+        this.buyFreeSpinButton.y = CONFIG.BTN_BUY_FREE_Y;
+        this.buyFreeSpinButton.interactive = true;
+        this.buyFreeSpinButton.eventMode = "static";
+        this.buyFreeSpinButton.cursor = "pointer";
+        this.buyFreeSpinButton.on("pointerdown", this.onBuyFreeSpins);
+        this.container.addChild(this.buyFreeSpinButton);
+
         this.spinButton = new Sprite(Assets.get("spinBTN.png"));
         this.spinButton.anchor.set(0.5);
-        this.spinButton.scale.set(CONFIG.SPIN_BTN_SIZE); 
+        this.spinButton.scale.set(CONFIG.SPIN_BTN_SIZE);
         this.spinButton.x = CONFIG.BTN_SPIN_X;
         this.spinButton.y = CONFIG.BTN_SPIN_Y;
         this.spinButton.interactive = true;
@@ -69,7 +86,6 @@ export class UIManager {
         this.spinButton.on("pointerdown", this.onSpin);
         this.container.addChild(this.spinButton);
 
-        // Auto Spin
         this.autoSpinButton = new Sprite(Assets.get("autoSpin.png"));
         this.autoSpinButton.anchor.set(0.5);
         this.autoSpinButton.scale.set(CONFIG.BTN_AUTO_SCALE);
@@ -178,6 +194,109 @@ export class UIManager {
         this.container.addChild(this.bonusSpinsText);
     }
 
+    public showBuyFreeSpinsModal(cost: number, onConfirm: () => void, onCancel?: () => void) {
+        this.hideModal();
+
+        const modal = new Container();
+        modal.zIndex = 1000;
+        modal.eventMode = "static";
+
+        const overlay = new Graphics()
+            .rect(-CONFIG.DESIGN_WIDTH, -CONFIG.DESIGN_HEIGHT, CONFIG.DESIGN_WIDTH * 2, CONFIG.DESIGN_HEIGHT * 2)
+            .fill({ color: 0x000000, alpha: 0.65 });
+        overlay.eventMode = "static";
+        overlay.cursor = "default";
+      
+        overlay.on("pointerdown", () => {});
+        modal.addChild(overlay);
+
+        const panel = new Graphics()
+            .roundRect(-320, -180, 640, 360, 24)
+            .fill({ color: 0x15110C, alpha: 0.95 })
+            .stroke({ color: 0xBA8A4C, width: 4, alpha: 0.9 });
+        panel.eventMode = "static";
+        modal.addChild(panel);
+
+        const title = new Text({
+            text: "BUY FREE SPINS?",
+            style: new TextStyle({
+                fill: 0xffffff,
+                fontSize: 52,
+                fontWeight: "800",
+                align: "center",
+                dropShadow: { color: 0x000000, blur: 8, distance: 0, angle: 0 },
+            }),
+        });
+        title.anchor.set(0.5);
+        title.position.set(0, -95);
+        title.resolution = 2;
+        modal.addChild(title);
+
+        const body = new Text({
+            text: `Cost: ₱${Math.floor(cost)}\nThis will trigger a scatter bonus.`,
+            style: new TextStyle({
+                fill: 0xffffff,
+                fontSize: 34,
+                fontWeight: "600",
+                align: "center",
+                lineHeight: 44,
+            }),
+        });
+        body.anchor.set(0.5);
+        body.position.set(0, 0);
+        body.resolution = 2;
+        modal.addChild(body);
+
+        const makeButton = (label: string, x: number, y: number, color: number) => {
+            const btn = new Container();
+            btn.position.set(x, y);
+            btn.eventMode = "static";
+            btn.cursor = "pointer";
+
+            const bg = new Graphics()
+                .roundRect(-165, -48, 330, 96, 18)
+                .fill({ color, alpha: 1 })
+                .stroke({ color: 0xBA8A4C, width: 3, alpha: 0.7 });
+            btn.addChild(bg);
+
+            const t = new Text({
+                text: label,
+                style: new TextStyle({ fill: 0xffffff, fontSize: 38, fontWeight: "800" }),
+            });
+            t.anchor.set(0.5);
+            t.resolution = 2;
+            btn.addChild(t);
+
+            return btn;
+        };
+
+        const confirmBtn = makeButton("CONFIRM", -170, 110, 0xF3CB0D);
+        const cancelBtn = makeButton("CANCEL", 170, 110, 0xb00020);
+
+        confirmBtn.on("pointerdown", () => {
+            this.hideModal();
+            onConfirm();
+        });
+
+        cancelBtn.on("pointerdown", () => {
+            this.hideModal();
+            onCancel?.();
+        });
+
+        modal.addChild(confirmBtn);
+        modal.addChild(cancelBtn);
+
+        this.modalContainer = modal;
+        this.container.addChild(modal);
+    }
+
+    public hideModal() {
+        if (!this.modalContainer) return;
+        if (this.modalContainer.parent) this.modalContainer.parent.removeChild(this.modalContainer);
+        this.modalContainer.destroy({ children: true });
+        this.modalContainer = null;
+    }
+
     // bet sizing
     updateBetTextDisplay(textToShow: string, isEditing: boolean = false) {
         this.betAmountText.text = textToShow;
@@ -206,6 +325,7 @@ export class UIManager {
         
         if (this.spinButton) this.spinButton.tint = tintColor;
         if (this.autoSpinButton) this.autoSpinButton.tint = tintColor;
+        if (this.buyFreeSpinButton) this.buyFreeSpinButton.tint = tintColor;
         if (this.maxBetButton) this.maxBetButton.tint = tintColor;
         if (this.minusButton) this.minusButton.tint = tintColor;
         if (this.plusButton) this.plusButton.tint = tintColor;

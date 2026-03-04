@@ -74,7 +74,7 @@ export class VFXManager {
         scale *= CONFIG.MACHINE_SCALE;
         return {
             x: screenWidth / 2 + CONFIG.SLOT_OFFSET_X * scale,
-            y: screenHeight / 2.2,
+            y: screenHeight / 2.2 + CONFIG.SLOT_OFFSET_Y * scale,
             scale,
         };
     }

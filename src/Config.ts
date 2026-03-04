@@ -4,7 +4,9 @@ export const CONFIG = {
     DESIGN_WIDTH: 1920,
     DESIGN_HEIGHT: 1080,
 
-    SLOT_OFFSET_X: 200,
+    // Global layout offsets 
+    SLOT_OFFSET_X: 0,
+    SLOT_OFFSET_Y: 100,
     BACKGROUND_OFFSET_X: 0, 
     REEL_OFFSET_X: -10,      
     REEL_OFFSET_Y:-20,    
@@ -26,13 +28,15 @@ export const CONFIG = {
     CONSOLE_Y: 490,     
     
 
-    // UI Buttons
-    BTN_SPIN_X: 0,
-    BTN_SPIN_Y: 560,
+    // Right-side button column 
+    BTN_RIGHT_COLUMN_X: 1100,
+    BTN_BUY_FREE_Y: -400,
+    BTN_BUY_FREE_SCALE: 0.65,
+    BTN_SPIN_Y: 10,
+    BTN_SPIN_X: 1100,
     SPIN_BTN_SIZE: 0.7,
-
-    BTN_AUTO_X: -250,       
-    BTN_AUTO_Y: 560,
+    BTN_AUTO_Y: 380,
+    BTN_AUTO_X: 1100,
     BTN_AUTO_SCALE: 0.7,
 
     BTN_MENU_X: 893,   
@@ -168,7 +172,7 @@ export const ASSETS = {
         "wild.png", "sc.png"
     ],
     
-UI: ["border.png", "menu.png", "hat.png", "title.png",
+UI: ["border.png", "menu.png", "freespin.png","hat.png", "title.png",
         "spinBTN.png", "autoSpin.png", "plus.png", 
         "minus.png", "1.png",
          "vortex.png", "bet.png","balance.png","totalwin.png"],

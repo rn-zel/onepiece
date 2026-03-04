@@ -1,6 +1,6 @@
-export type SymbolIndex = number; // 0..N-1 (matches ASSETS.TEXTURES order)
+export type SymbolIndex = number; 
 
-export type Grid = SymbolIndex[][]; // grid[reelIndex][rowIndex]
+export type Grid = SymbolIndex[][]; 
 
 export type GridPosition = { reel: number; row: number };
 
@@ -19,10 +19,7 @@ export type WinEvaluationResult = {
   winningPositions: GridPosition[];
 };
 
-/**
- * Paytable abstraction for symbol payouts.
- * Returns multipliers that will be scaled by the current bet amount.
- */
+
 export interface Paytable {
   /**
    * Multiplier for a given symbol and match length (3, 4, 5 of a kind).
@@ -31,7 +28,7 @@ export interface Paytable {
   getSymbolMultiplier(symbolIndex: SymbolIndex, matchLength: number): number;
 
   /**
-   * Multiplier used for jackpot-style wins (e.g. 5 wilds on a payline).
+   * Multiplier used for jackpot-style wins
    */
   getJackpotMultiplier(): number;
 }
