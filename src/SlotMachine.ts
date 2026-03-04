@@ -249,14 +249,23 @@ export class SlotMachine {
     if (this.starfield) this.starfield.triggerWarp(true);
 
     gsap.killTweensOf(this.uiManager.spinButton);
+    
     gsap.fromTo(
       this.uiManager.spinButton.scale,
       { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 },
       { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.4, ease: "back.out(2)" }
     );
 
-   
-    this.clearActiveAnimations(); 
+    gsap.to(this.uiManager.spinButton, {
+        rotation: "+=" + (Math.PI * 100), duration: 2.5, ease: "power4.out",
+        onComplete: () => {
+            gsap.to(this.uiManager.spinButton, {
+                rotation: "+=" + (Math.PI * 2), duration: 15, repeat: -1, ease: "none"
+            });
+        }
+    });
+
+    this.clearActiveAnimations();
 
     this.reels.forEach((r) => {
       r.container.zIndex = 0;
@@ -368,123 +377,137 @@ export class SlotMachine {
   }
 
   /** Backend mode */
+  /** Backend mode */
   private async spinFromBackend(isBonusSpin: boolean) {
-    this.soundManager.playSFX("sfx_spin");
-    if (this.starfield) this.starfield.triggerWarp(true);
-    this.uiManager.spinButton.alpha = 0.6;
+    // 1. Immediately disable UI while we fetch from the backend
+    this.running = true;
     this.uiManager.spinButton.interactive = false;
+    this.uiManager.spinButton.alpha = 0.6;
     this.uiManager.winText.text = "";
     this.lastSpinWin = 0;
     this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
 
     try {
+      // 2. Fetch the result from the backend
       const data = isBonusSpin ? await SlotApi.playFreeGame() : await SlotApi.play(this.betAmount);
-      if (this.starfield) this.starfield.triggerWarp(false);
+      
       this.balance = data.balance;
       this.bonusSpins = data.free_spin?.count ?? 0;
-
       const grid = SlotApi.backendReelToGrid(data.slot.reel);
-      this.applyVisibleGridIndices(grid);
-      this.reels.forEach((r) => { r.isFreeSpins = this.bonusSpins > 0; });
 
-      const hasCascade = data.slot.cascaded && data.slot.cascaded.length > 0 && data.slot.cascaded.some((s) => s.win > 0);
-      const isEnteringFreeSpins = !!data.free_spin && (data.free_spin.count ?? 0) > 0 && !this.vfxManager.isFreeSpinsTheme;
-      const isExitingFreeSpins = this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
+      // ✨ 3. THE FIX: Pass the backend grid into our smooth animation player!
+      // This will handle the button bounce, sound effects, reel spins, and smooth stopping.
+      this.playOneSpinAnimation(async () => {
+        
+        // --- EVERYTHING BELOW HAPPENS *AFTER* THE REELS STOP SPINNING ---
+        this.reels.forEach((r) => { r.isFreeSpins = this.bonusSpins > 0; });
 
-      if (hasCascade) {
-        this.running = true;
-        this.uiManager.spinButton.interactive = false;
-        this.uiManager.spinButton.alpha = 0.6;
-        await this.playCascadeSequenceFromBackend(data.slot.cascaded!, data.total_win);
-        this.balance = data.balance;
-        this.sessionWins += data.total_win;
-        this.lastSpinWin = data.total_win;
-        this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-        this.running = false;
-        this.uiManager.spinButton.interactive = true;
-        this.uiManager.spinButton.alpha = 1;
-        if (this.autoSpinActive) gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
-        return;
-      }
+        const hasCascade = data.slot.cascaded && data.slot.cascaded.length > 0 && data.slot.cascaded.some((s) => s.win > 0);
+        const isEnteringFreeSpins = !!data.free_spin && (data.free_spin.count ?? 0) > 0 && !this.vfxManager.isFreeSpinsTheme;
+        const isExitingFreeSpins = this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
 
-      if (data.total_win > 0) {
-        this.soundManager.playSFX("sfx_win");
-        this.reels.forEach((r) => r.symbols.forEach((s) => (s.tint = 0x555555)));
-        this.sessionWins += data.total_win;
-        this.lastSpinWin = data.total_win;
-        this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-        this.uiManager.winText.style.fontSize = 100;
-        this.uiManager.winText.text = `WIN ₱${Math.floor(data.total_win)}`;
-        this.uiManager.winText.style.fill = 0xffd700;
-        this.uiManager.winText.scale.set(0.01);
-        gsap.delayedCall(0.35, () => {
-          gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
-        });
-      }
+        // Cascade Logic
+        if (hasCascade) {
+          this.running = true;
+          this.uiManager.spinButton.interactive = false;
+          this.uiManager.spinButton.alpha = 0.6;
+          await this.playCascadeSequenceFromBackend(data.slot.cascaded!, data.total_win);
+          this.balance = data.balance;
+          this.sessionWins += data.total_win;
+          this.lastSpinWin = data.total_win;
+          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+          this.running = false;
+          this.uiManager.spinButton.interactive = true;
+          this.uiManager.spinButton.alpha = 1;
+          if (this.autoSpinActive) gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
+          return;
+        }
 
-      if (isEnteringFreeSpins) {
-        this.running = true;
-        this.uiManager.spinButton.interactive = false;
-        this.uiManager.spinButton.alpha = 0.5;
-        gsap.delayedCall(1.5, () => {
-          this.soundManager.playSFX("sfx_maxwin");
-          this.uiManager.winText.text = "MEGA BONUS!\n\n10 SPINS!";
+        // Normal Win Logic
+        if (data.total_win > 0) {
+          this.soundManager.playSFX("sfx_win");
+          this.reels.forEach((r) => r.symbols.forEach((s) => (s.tint = 0x555555)));
+          this.sessionWins += data.total_win;
+          this.lastSpinWin = data.total_win;
+          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
           this.uiManager.winText.style.fontSize = 100;
+          this.uiManager.winText.text = `WIN ₱${Math.floor(data.total_win)}`;
           this.uiManager.winText.style.fill = 0xffd700;
           this.uiManager.winText.scale.set(0.01);
-          gsap.to(this.uiManager.winText.scale, {
-            x: 1, y: 1, duration: 3, ease: "elastic.out(1, 0.4)",
-            onComplete: () => {
-              this.vfxManager.playBlackHoleTransition(true, () => {
-                this.vfxManager.swapTheme(true, this.reels);
-                this.uiManager.toggleButtonTheme(true);
-                this.leftTopUI.setTheme(true);
-                this.titleUI.setTheme(true);
+          gsap.delayedCall(0.35, () => {
+            gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+          });
+        }
+
+        // Entering Free Spins Logic
+        if (isEnteringFreeSpins) {
+          this.running = true;
+          this.uiManager.spinButton.interactive = false;
+          this.uiManager.spinButton.alpha = 0.5;
+          gsap.delayedCall(1.5, () => {
+            this.soundManager.playSFX("sfx_maxwin");
+            this.uiManager.winText.text = "MEGA BONUS!\n\n10 SPINS!";
+            this.uiManager.winText.style.fontSize = 100;
+            this.uiManager.winText.style.fill = 0xffd700;
+            this.uiManager.winText.scale.set(0.01);
+            gsap.to(this.uiManager.winText.scale, {
+              x: 1, y: 1, duration: 3, ease: "elastic.out(1, 0.4)",
+              onComplete: () => {
+                this.vfxManager.playBlackHoleTransition(true, () => {
+                  this.vfxManager.swapTheme(true, this.reels);
+                  this.uiManager.toggleButtonTheme(true);
+                  this.leftTopUI.setTheme(true);
+                  this.titleUI.setTheme(true);
+                }, () => {
+                  this.running = false;
+                  this.uiManager.spinButton.interactive = true;
+                  this.uiManager.spinButton.alpha = 1;
+                  this.uiManager.winText.text = "";
+                  if (this.bonusSpins > 0) this.startSpin();
+                });
+              },
+            });
+          });
+          return;
+        }
+
+        // Exiting Free Spins Logic
+        if (isExitingFreeSpins) {
+          this.running = true;
+          this.uiManager.spinButton.interactive = false;
+          this.uiManager.spinButton.alpha = 0.5;
+          gsap.delayedCall(1, () => {
+            this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(this.sessionWins)}`;
+            this.uiManager.winText.style.fill = 0x00ff00;
+            this.uiManager.winText.scale.set(0.01);
+            gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(1)" });
+            gsap.delayedCall(2, () => {
+              this.vfxManager.playBlackHoleTransition(false, () => {
+                this.vfxManager.swapTheme(false, this.reels);
+                this.uiManager.toggleButtonTheme(false);
+                this.leftTopUI.setTheme(false);
+                this.titleUI.setTheme(false);
+                this.uiManager.winText.text = "";
               }, () => {
                 this.running = false;
                 this.uiManager.spinButton.interactive = true;
                 this.uiManager.spinButton.alpha = 1;
-                this.uiManager.winText.text = "";
-                if (this.bonusSpins > 0) this.startSpin();
+                this.sessionWins = 0;
+                if (this.autoSpinActive) gsap.delayedCall(1, () => this.startSpin());
               });
-            },
-          });
-        });
-        return;
-      }
-
-      if (isExitingFreeSpins) {
-        this.running = true;
-        this.uiManager.spinButton.interactive = false;
-        this.uiManager.spinButton.alpha = 0.5;
-        gsap.delayedCall(1, () => {
-          this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(this.sessionWins)}`;
-          this.uiManager.winText.style.fill = 0x00ff00;
-          this.uiManager.winText.scale.set(0.01);
-          gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(1)" });
-          gsap.delayedCall(2, () => {
-            this.vfxManager.playBlackHoleTransition(false, () => {
-              this.vfxManager.swapTheme(false, this.reels);
-              this.uiManager.toggleButtonTheme(false);
-              this.leftTopUI.setTheme(false);
-              this.titleUI.setTheme(false);
-              this.uiManager.winText.text = "";
-            }, () => {
-              this.running = false;
-              this.uiManager.spinButton.interactive = true;
-              this.uiManager.spinButton.alpha = 1;
-              this.sessionWins = 0;
-              if (this.autoSpinActive) gsap.delayedCall(1, () => this.startSpin());
             });
           });
-        });
-        return;
-      }
+          return;
+        }
 
-      this.running = false;
-      this.uiManager.spinButton.interactive = true;
-      this.uiManager.spinButton.alpha = 1;
-      if (this.autoSpinActive) gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
+        // If no cascade and no transitions, just clean up and proceed
+        this.running = false;
+        this.uiManager.spinButton.interactive = true;
+        this.uiManager.spinButton.alpha = 1;
+        if (this.autoSpinActive) gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
+
+      }, grid); // <-- Pass the grid here!
+
     } catch (e) {
       console.error("Backend spin failed:", e);
       if (isBonusSpin) this.bonusSpins++; else this.balance += this.betAmount;
