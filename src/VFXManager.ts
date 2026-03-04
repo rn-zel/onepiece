@@ -122,7 +122,7 @@ export class VFXManager {
         // change music
         this.soundManager.playBGM(toFreeSpins);
         gsap.delayedCall(1.0, () => this.soundManager.playBGM(toFreeSpins));
-        
+
         reels.forEach(r => {
             r.isFreeSpins = toFreeSpins;
             if (toFreeSpins) r.removeScattersInstantly(); 

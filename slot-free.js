@@ -10,8 +10,8 @@ const buyFreeData = [];
 
 let freeSpinCounter = 0;
 let totalFreeWin = 0;
-let playerBalance = 1500000;
-let totalBet = 80000;
+let playerBalance = 1500;
+let totalBet = 200;
 let jackpotWin = 25000;
 
 let jackpot_prizes = {

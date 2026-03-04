@@ -1,24 +1,27 @@
-import { PAYLINES, PAYOUTS, SYMBOL_BASE } from "../../Config";
+import { PAYLINES } from "../../Config";
 import { SYMBOL, isScatter, isWild } from "./symbols";
-import type { Grid, GridPosition, Win, WinEvaluationResult, WinEvaluator, WinMode } from "./types";
+import type {
+  Grid,
+  GridPosition,
+  Win,
+  WinEvaluationResult,
+  WinEvaluator,
+  WinMode,
+  Paytable,
+} from "./types";
 
 /** True if symbol index is a paying symbol (A,K,Q,J,S1,S2,S3,S4). */
 function isPayingSymbol(idx: number): boolean {
   return idx >= 0 && idx <= 7 && idx !== SYMBOL.WILD && idx !== SYMBOL.SCATTER;
 }
 
-/** Base multiplier for 3-of-a-kind; 4/5 use MULTI_4/MULTI_5. */
-function payoutForMatchLength(symbolIndex: number, matchLength: number): number {
-  const base = SYMBOL_BASE[symbolIndex];
-  if (base == null || base === 0) return 0;
-  if (matchLength === 3) return base;
-  if (matchLength === 4) return base * PAYOUTS.MULTI_4;
-  if (matchLength === 5) return base * PAYOUTS.MULTI_5;
-  return 0;
-}
-
 export class PaylineWinEvaluator implements WinEvaluator {
   readonly mode: WinMode = "PAYLINES";
+  private readonly paytable: Paytable;
+
+  constructor(paytable: Paytable) {
+    this.paytable = paytable;
+  }
 
   evaluate(grid: Grid, betAmount: number): WinEvaluationResult {
     const wins: Win[] = [];
@@ -43,7 +46,7 @@ export class PaylineWinEvaluator implements WinEvaluator {
       ) {
         const positions: GridPosition[] = line.map((row, reel) => ({ reel, row }));
         wins.push({
-          payout: betAmount * PAYOUTS.JACKPOT,
+          payout: betAmount * this.paytable.getJackpotMultiplier(),
           matchLength: 5,
           positions,
           meta: { lineIndex, isJackpot: true },
@@ -79,7 +82,7 @@ export class PaylineWinEvaluator implements WinEvaluator {
 
         if (!isPayingSymbol(targetIndex)) continue;
 
-        const multiplier = payoutForMatchLength(targetIndex, matchLength);
+        const multiplier = this.paytable.getSymbolMultiplier(targetIndex, matchLength);
         const payout = betAmount * multiplier;
 
         if (!bestWinForLine || payout > bestWinForLine.payout) {

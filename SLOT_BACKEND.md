@@ -1,6 +1,7 @@
-## Backend Integration Overview
+# Backend Integration 
 
-This project supports two operating modes:
+
+two operating modes:
 
 - **Local mode** – the client (Pixi `SlotMachine`) generates symbols, evaluates wins, and runs cascades entirely in the browser.
 - **Backend mode** – the client delegates spin logic to a backend API (the sample Express server in `slot-free.js`) and only handles presentation (reels, animations, and UI).

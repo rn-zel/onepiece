@@ -1,20 +1,17 @@
-import { PAYOUTS, SYMBOL_BASE } from "../../Config";
 import { isScatter, isWild } from "./symbols";
-import type { Grid, GridPosition, Win, WinEvaluationResult, WinEvaluator, WinMode } from "./types";
+import type {
+  Grid,
+  GridPosition,
+  Win,
+  WinEvaluationResult,
+  WinEvaluator,
+  WinMode,
+  Paytable,
+} from "./types";
 
 /** True if symbol index is a paying symbol (A,K,Q,J,S1,S2,S3,S4). */
 function isPayingSymbol(idx: number): boolean {
   return idx >= 0 && idx <= 7;
-}
-
-/** Base multiplier for 3-of-a-kind; 4/5 use MULTI_4/MULTI_5. */
-function payoutForMatchLength(symbolIndex: number, matchLength: number): number {
-  const base = SYMBOL_BASE[symbolIndex];
-  if (base == null || base === 0) return 0;
-  if (matchLength === 3) return base;
-  if (matchLength === 4) return base * PAYOUTS.MULTI_4;
-  if (matchLength === 5) return base * PAYOUTS.MULTI_5;
-  return 0;
 }
 
 /**
@@ -26,11 +23,16 @@ function payoutForMatchLength(symbolIndex: number, matchLength: number): number 
  */
 export class Ways243WinEvaluator implements WinEvaluator {
   readonly mode: WinMode = "WAYS_243";
+  private readonly paytable: Paytable;
+
+  constructor(paytable: Paytable) {
+    this.paytable = paytable;
+  }
 
   evaluate(grid: Grid, betAmount: number): WinEvaluationResult {
     const wins: Win[] = [];
 
-    // Evaluate ways for each paying symbol (0=A,1=K,2=Q,3=J,4=S1,5=S2,6=S3,7=S4).
+    // Evaluate each paying symbol 
     for (let target = 0; target <= 7; target++) {
       if (!isPayingSymbol(target)) continue;
 
@@ -47,7 +49,7 @@ export class Ways243WinEvaluator implements WinEvaluator {
       if (matchLength < 3) continue;
 
       const waysCount = matchesPerReel.reduce((prod, c) => prod * c, 1);
-      const multiplier = payoutForMatchLength(target, matchLength);
+      const multiplier = this.paytable.getSymbolMultiplier(target, matchLength);
       const payout = betAmount * multiplier * waysCount;
       if (payout <= 0) continue;
 

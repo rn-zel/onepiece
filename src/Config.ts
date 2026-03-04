@@ -81,10 +81,7 @@ export const CONFIG = {
     BALANCE_BG_X: 530,
     BALANCE_BG_Y: 585,
 
-    // // model
-    // MODEL_LEFT_X: -520,
-    // MODEL_LEFT_Y: 0,
-    // MODEL_SCALE: 0.5,
+
 
     // UI color theme
     UI_COLORS: {
@@ -168,7 +165,7 @@ export const ASSETS = {
     TEXTURES: [
         "a.png", "k.png", "q.png", "j.png",
         "s1.png", "s2.png", "s3.png", "s4.png",
-        "wild.png", "scatter.png"
+        "wild.png", "sc.png"
     ],
     
 UI: ["border.png", "menu.png", "hat.png", "title.png",

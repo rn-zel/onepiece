@@ -11,7 +11,7 @@ export type CascadeStep = {
 
 export type CascadeResult = {
   steps: CascadeStep[];
-  /** Sum of all stepWin. */
+
   totalWin: number;
   finalGrid: Grid;
 };

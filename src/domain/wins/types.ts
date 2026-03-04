@@ -19,6 +19,23 @@ export type WinEvaluationResult = {
   winningPositions: GridPosition[];
 };
 
+/**
+ * Paytable abstraction for symbol payouts.
+ * Returns multipliers that will be scaled by the current bet amount.
+ */
+export interface Paytable {
+  /**
+   * Multiplier for a given symbol and match length (3, 4, 5 of a kind).
+   * Returns 0 when the combination does not pay.
+   */
+  getSymbolMultiplier(symbolIndex: SymbolIndex, matchLength: number): number;
+
+  /**
+   * Multiplier used for jackpot-style wins (e.g. 5 wilds on a payline).
+   */
+  getJackpotMultiplier(): number;
+}
+
 export interface WinEvaluator {
   readonly mode: WinMode;
   evaluate(grid: Grid, betAmount: number): WinEvaluationResult;

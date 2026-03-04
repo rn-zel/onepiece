@@ -15,8 +15,9 @@ import { LeftTopUI } from "./ui/lefttop";
 import { TitleUI } from "./ui/title";
 import { PaylineWinEvaluator } from "./domain/wins/PaylineWinEvaluator";
 import { Ways243WinEvaluator } from "./domain/wins/Ways243WinEvaluator";
-import { CascadeEngine } from "./domain/wins/CascadeEngine";
 import { SYMBOL } from "./domain/wins/symbols";
+import { ConfigPaytable } from "./domain/wins/ConfigPaytable";
+import type { WinEvaluator } from "./domain/wins/types";
 
 import type { SymbolAnimation } from "./services/SymbolAnimation";
 
@@ -31,6 +32,8 @@ export class SlotMachine {
   titleUI: TitleUI;
   vfxManager!: VFXManager;
   winManager!: WinManager;
+  private paylineEvaluator!: WinEvaluator;
+  private waysEvaluator!: WinEvaluator;
   soundManager: SoundManager = new SoundManager();
 
   reels: Reel[] = [];
@@ -84,7 +87,6 @@ export class SlotMachine {
 
     this.setupLightning();
     this.winManager = new WinManager(this.slotTextures);
-    // this.vfxManager = new VFXManager(this.app, this.mainContainer, this.backgroundContainer, this.soundManager, this.lightning, this.starfield);
     this.vfxManager = new VFXManager(
         this.app, 
         this.mainContainer, 
@@ -102,6 +104,11 @@ export class SlotMachine {
     );
     this.uiManager.container.zIndex = 100;
     this.mainContainer.addChild(this.uiManager.container);
+
+    // Domain win evaluation wiring (SOLID: inject shared paytable into evaluators)
+    const paytable = new ConfigPaytable();
+    this.paylineEvaluator = new PaylineWinEvaluator(paytable);
+    this.waysEvaluator = new Ways243WinEvaluator(paytable);
 
     this.leftTopUI = new LeftTopUI();
     this.leftTopUI.getContainer().zIndex = 20; 
@@ -127,6 +134,7 @@ export class SlotMachine {
     window.addEventListener("resize", () => this.handleResize());
     this.waterBg.play();
 
+    // BACKEND MODE START
     if (CONFIG.USE_BACKEND) {
       SlotApi.setSlotApiBaseUrl(CONFIG.API_BASE_URL);
       void this.loadFromBackend();
@@ -353,6 +361,8 @@ export class SlotMachine {
       });
     }
   }
+      // BACKEND MODE END
+
 
 
 
@@ -613,14 +623,14 @@ private setupBackground() {
           onComplete: () => {
               this.bounceSpecialSymbols(r); 
               if (i === this.reels.length - 1) {
-                  this.reelsComplete();
+                  void this.reelsComplete();
               }
           }
       });
     });
   }
 
-    private reelsComplete() {
+    private async reelsComplete() {
         this.uiManager.spinButton.alpha = 1;
         this.running = false;
         if (this.starfield) this.starfield.triggerWarp(false);
@@ -632,20 +642,42 @@ private setupBackground() {
         let sequenceDelay = 0; 
         const grid = this.getVisibleGridIndices();
         const evaluator =
-            CONFIG.WIN_MODE === "WAYS_243" ? new Ways243WinEvaluator() : new PaylineWinEvaluator();
+            CONFIG.WIN_MODE === "WAYS_243" ? this.waysEvaluator : this.paylineEvaluator;
 
-        const evaluation = evaluator.evaluate(grid, this.betAmount);
+        // Use local spin engine when cascading is enabled; fall back to direct evaluation otherwise.
+        let evaluation = evaluator.evaluate(grid, this.betAmount);
+        let totalWinAllCascades = evaluation.totalWin;
+        let cascadeResult: { steps: any[]; totalWin: number; finalGrid: number[][] } = {
+            steps: [],
+            totalWin: evaluation.totalWin,
+            finalGrid: grid,
+        };
 
-        const cascadeResult = CONFIG.ENABLE_CASCADING
-            ? new CascadeEngine(
-                evaluator,
+        if (CONFIG.ENABLE_CASCADING) {
+            const { LocalSpinEngine } = await import("./domain/spin/LocalSpinEngine");
+            const engine = new LocalSpinEngine(
+                this.paylineEvaluator,
+                this.waysEvaluator,
                 (reelIndex) => this.randomSymbolIndexForReel(reelIndex),
                 20
-            ).run(grid, this.betAmount)
-            : { steps: [], totalWin: evaluation.totalWin, finalGrid: grid };
+            );
+            const spinResult = await engine.spin({
+                grid,
+                betAmount: this.betAmount,
+                mode: CONFIG.WIN_MODE,
+            });
+            cascadeResult = {
+                steps: spinResult.cascades,
+                totalWin: spinResult.totalWin,
+                finalGrid: spinResult.finalGrid,
+            };
+            totalWinAllCascades = cascadeResult.totalWin;
+            if (spinResult.cascades.length > 0) {
+                evaluation = spinResult.cascades[0].evaluation;
+            }
+        }
 
         const wins = evaluation.wins;
-        const totalWinAllCascades = CONFIG.ENABLE_CASCADING ? cascadeResult.totalWin : evaluation.totalWin;
         
         
         // NORMAL WINS
@@ -1161,7 +1193,6 @@ private setupBackground() {
 
       await Promise.all(tweens.map((t) => this.tweenToEnd(t)));
 
-      // Ensure the final grid indices/textures are correct and snapped to row positions
       this.applyVisibleGridIndices(afterGrid);
   }
 

@@ -1,7 +1,3 @@
-/**
- * Slot API client for backend-ready mode.
- * Matches the response shape from slot-free.js (Express sample backend).
- */
 
 const SYMBOL_NAME_TO_INDEX: Record<string, number> = {
   a: 0, k: 1, q: 2, j: 3,
@@ -19,7 +15,6 @@ export function symbolIndexToName(index: number): string {
   return INDEX_TO_SYMBOL[index] ?? "a";
 }
 
-/** Backend reel: 5 columns, each column = 3 symbol names (rows 0,1,2). */
 export type BackendReel = string[][];
 
 export type BackendWinning = {
