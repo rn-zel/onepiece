@@ -64,6 +64,10 @@ export class UIManager {
             fill: 0xffffff, fontSize: 36, fontWeight: "bold",
             dropShadow: { color: 0x00d9ff, blur: 6, distance: 0, angle: 0 }, align: "center"
         });
+        const titleStyle = new TextStyle({
+            fill: CONFIG.TITLE_LABEL_FILL, fontSize: 22, fontWeight: "bold",
+            dropShadow: { color: CONFIG.TITLE_LABEL_GLOW, blur: 4, distance: 0, angle: 0 }, align: "center"
+        });
 
         this.buyFreeSpinButton = new Sprite(Assets.get("freespin.png"));
         this.buyFreeSpinButton.anchor.set(0.5);
@@ -105,6 +109,14 @@ export class UIManager {
         this.container.addChild(this.menuButton);
 
         // BALANCE 
+        const balanceTitle = new Text({ text: "Balance", style: titleStyle });
+        balanceTitle.anchor.set(0, 0.5);
+        balanceTitle.x = CONFIG.TITLE_BALANCE_X;
+        balanceTitle.y = CONFIG.TITLE_BALANCE_Y;
+        balanceTitle.resolution = 3;
+        balanceTitle.zIndex = 6;
+        this.container.addChild(balanceTitle);
+
         const balanceBg = new Sprite(Assets.get("balance.png")); 
         balanceBg.anchor.set(0, 0.5); 
         balanceBg.scale.set(CONFIG.BALANCE_BG_SCALE);
@@ -120,6 +132,14 @@ export class UIManager {
         this.container.addChild(this.balanceText);
 
         // BET
+        const betTitle = new Text({ text: "Bet", style: titleStyle });
+        betTitle.anchor.set(0, 0.5);
+        betTitle.x = CONFIG.TITLE_BET_X;
+        betTitle.y = CONFIG.TITLE_BET_Y;
+        betTitle.resolution = 3;
+        betTitle.zIndex = 6;
+        this.container.addChild(betTitle);
+
         const betBg = new Sprite(Assets.get("bet.png")); 
         betBg.anchor.set(0, 0.5);
         betBg.scale.set(CONFIG.BET_BG_SCALE);
@@ -139,6 +159,14 @@ export class UIManager {
         this.container.addChild(this.betAmountText);
 
         // TOTAL WIN 
+        const totalWinTitle = new Text({ text: "Total Win", style: titleStyle });
+        totalWinTitle.anchor.set(0, 0);
+        totalWinTitle.x = CONFIG.TITLE_TOTALWIN_X;
+        totalWinTitle.y = CONFIG.TITLE_TOTALWIN_Y;
+        totalWinTitle.resolution = 3;
+        totalWinTitle.zIndex = 6;
+        this.container.addChild(totalWinTitle);
+
         const winBg = new Sprite(Assets.get("totalwin.png"));
         winBg.anchor.set(0, 0.5);
         winBg.scale.set(CONFIG.TOTALWIN_BG_SCALE);
@@ -147,7 +175,7 @@ export class UIManager {
         this.container.addChild(winBg);
 
         this.totalWinText = new Text({ text: "₱0", style: glowStyle });
-        this.totalWinText.anchor.set(0, 0.5);
+        this.totalWinText.anchor.set(0.5, 0.5);
         this.totalWinText.x = CONFIG.TEXT_TOTALWIN_X;
         this.totalWinText.resolution = 3;
         this.totalWinText.y = CONFIG.TEXT_TOTALWIN_Y;
@@ -233,7 +261,7 @@ export class UIManager {
         modal.addChild(title);
 
         const body = new Text({
-            text: `Cost: ₱${Math.floor(cost)}\nThis will trigger a scatter bonus.`,
+            text: `Cost: ₱${Math.floor(cost).toLocaleString()}\nThis will trigger a scatter bonus.`,
             style: new TextStyle({
                 fill: 0xffffff,
                 fontSize: 34,
@@ -299,9 +327,9 @@ export class UIManager {
 
     // bet sizing
     updateBetTextDisplay(textToShow: string, isEditing: boolean = false) {
-        this.betAmountText.text = textToShow;
+        this.betAmountText.text = `${textToShow.toLocaleString()}`;
         this.betAmountText.style.fill = isEditing ? 0x00ff00 : 0xffffff;
-        const cleanNumber = textToShow.replace(/[^0-9]/g, '');
+        const cleanNumber = textToShow.toLocaleString().replace(/[^0-9]/g, '');
         const len = cleanNumber.length;
         let newSize = 36;
         if (len >= 9) newSize = 27;
@@ -311,9 +339,9 @@ export class UIManager {
 
     //  updateBalance, Total Win, Free Spins 
     updateTextValues(balance: number, totalWin: number, bonusSpins: number) {
-        this.balanceText.text = `₱${balance}`;
-        this.totalWinText.text = `₱${totalWin}`;
-        if (bonusSpins > 0) this.bonusSpinsText.text = `FREE SPINS: ${bonusSpins}`;
+        this.balanceText.text = `₱${balance.toLocaleString()}`;
+        this.totalWinText.text = `₱${totalWin.toLocaleString()}`;
+        if (bonusSpins > 0) this.bonusSpinsText.text = `FREE SPINS: ${bonusSpins.toLocaleString()}`;
         else this.bonusSpinsText.text = "";
     }
 

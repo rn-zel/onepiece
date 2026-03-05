@@ -13,6 +13,7 @@ import { Starfield } from "./Starfield";
 import { WaterBg } from "./animation/WaterBg";
 import { LeftTopUI } from "./ui/lefttop";
 import { TitleUI } from "./ui/title";
+import { ModelUI } from "./ui/model";
 import { PaylineWinEvaluator } from "./domain/wins/PaylineWinEvaluator";
 import { Ways243WinEvaluator } from "./domain/wins/Ways243WinEvaluator";
 import { SYMBOL } from "./domain/wins/symbols";
@@ -30,6 +31,7 @@ export class SlotMachine {
   uiManager!: UIManager;
   leftTopUI: LeftTopUI;
   titleUI: TitleUI;
+  modelUI: ModelUI;
   vfxManager!: VFXManager;
   winManager!: WinManager;
   private paylineEvaluator!: WinEvaluator;
@@ -74,7 +76,7 @@ export class SlotMachine {
     this.starfield = starfield;
     this.waterBg = waterBg;
     
-    // Save our injected service!
+    // Save injected service
     this.symbolAnimator = symbolAnimator;
     
     this.soundManager.init();
@@ -84,6 +86,10 @@ export class SlotMachine {
     this.app.stage.addChild(this.mainContainer);
     this.mainContainer.addChild(this.backgroundContainer);
     this.mainContainer.addChild(this.reelContainer);
+
+    // Layering: background < model < reels < UI
+    this.backgroundContainer.zIndex = 0;
+    this.reelContainer.zIndex = 10;
 
     this.setupLightning();
     this.winManager = new WinManager(this.slotTextures);
@@ -111,16 +117,23 @@ export class SlotMachine {
     this.paylineEvaluator = new PaylineWinEvaluator(paytable);
     this.waysEvaluator = new Ways243WinEvaluator(paytable);
 
+    this.modelUI = new ModelUI();
+    this.modelUI.getContainer().zIndex = -10;
+    this.mainContainer.addChild(this.modelUI.getContainer());
+
     this.leftTopUI = new LeftTopUI();
     this.leftTopUI.getContainer().zIndex = 20; 
+
     this.titleUI = new TitleUI();
     this.titleUI.getContainer().zIndex = 15; 
+
     this.uiManager.container.addChild(this.leftTopUI.getContainer());
     this.uiManager.container.addChild(this.titleUI.getContainer());
     
-    // Ensure UI starts in non-free-spins theme.
+    //  UI starts in non-free-spins THEME
     this.leftTopUI.setTheme(false);
     this.titleUI.setTheme(false);
+    this.modelUI.setTheme(false);
 
     this.setupBackground();
     this.createReels();
@@ -142,7 +155,7 @@ export class SlotMachine {
     }
   }
 
-  /** Load balance and free spin count from backend (when USE_BACKEND). */
+  /* balance and free spinfrom backend */
   private async loadFromBackend() {
     try {
       const data = await SlotApi.load();
@@ -184,7 +197,6 @@ export class SlotMachine {
       purchasedFreeSpins = this.bonusSpins;
       
       //  Generate a fresh random grid 
-      // the reels look like new outcome.
       purchasedGrid = [];
       for (let i = 0; i < this.reels.length; i++) {
           const col = [];
@@ -217,8 +229,7 @@ export class SlotMachine {
   }
 
   private forceThreeScattersInView(grid: number[][]) {
-    // Ensure at least three scatters are visible in the 3x5 window (rows 0–2),
-    // but NEVER replace wilds (index 8). We only turn regular symbols into scatters.
+   
     const SCATTER_INDEX = 9;
     const WILD_INDEX = 8;
 
@@ -235,7 +246,7 @@ export class SlotMachine {
       const col = grid[x];
       if (!col) continue;
       for (let y = 0; y < 3 && scatterCount < 3; y++) {
-        if (col[y] === WILD_INDEX) continue; // do not convert wilds into scatters
+        if (col[y] === WILD_INDEX) continue; // NO SCATTER
         if (col[y] !== SCATTER_INDEX) {
           col[y] = SCATTER_INDEX;
           scatterCount++;
@@ -352,17 +363,18 @@ export class SlotMachine {
         duration: 2.2,
         ease: "elastic.out(1, 0.4)",
         onComplete: () => {
-          this.vfxManager.playBlackHoleTransition(
-            true,
-            () => {
-              this.vfxManager.swapTheme(true, this.reels);
-              this.uiManager.toggleButtonTheme(true);
-              this.leftTopUI.setTheme(true);
-              this.titleUI.setTheme(true);
-              this.reels.forEach((r) => {
-                r.isFreeSpins = true;
-              });
-            },
+              this.vfxManager.playBlackHoleTransition(
+                true,
+                () => {
+                  this.vfxManager.swapTheme(true, this.reels);
+                  this.uiManager.toggleButtonTheme(true);
+                  this.leftTopUI.setTheme(true);
+                  this.titleUI.setTheme(true);
+                  this.modelUI.setTheme(true);
+                  this.reels.forEach((r) => {
+                    r.isFreeSpins = true;
+                  });
+                },
             () => {
               this.running = false;
               this.uiManager.spinButton.interactive = true;
@@ -377,9 +389,8 @@ export class SlotMachine {
   }
 
   /** Backend mode */
-  /** Backend mode */
   private async spinFromBackend(isBonusSpin: boolean) {
-    // 1. Immediately disable UI while we fetch from the backend
+    //disable UI - fetch from the backend
     this.running = true;
     this.uiManager.spinButton.interactive = false;
     this.uiManager.spinButton.alpha = 0.6;
@@ -388,18 +399,17 @@ export class SlotMachine {
     this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
 
     try {
-      // 2. Fetch the result from the backend
+      // get the result from the backend
       const data = isBonusSpin ? await SlotApi.playFreeGame() : await SlotApi.play(this.betAmount);
       
       this.balance = data.balance;
       this.bonusSpins = data.free_spin?.count ?? 0;
       const grid = SlotApi.backendReelToGrid(data.slot.reel);
 
-      // ✨ 3. THE FIX: Pass the backend grid into our smooth animation player!
-      // This will handle the button bounce, sound effects, reel spins, and smooth stopping.
+      // pass the backend grid into animation 
       this.playOneSpinAnimation(async () => {
         
-        // --- EVERYTHING BELOW HAPPENS *AFTER* THE REELS STOP SPINNING ---
+        // reels stop 
         this.reels.forEach((r) => { r.isFreeSpins = this.bonusSpins > 0; });
 
         const hasCascade = data.slot.cascaded && data.slot.cascaded.length > 0 && data.slot.cascaded.some((s) => s.win > 0);
@@ -431,7 +441,7 @@ export class SlotMachine {
           this.lastSpinWin = data.total_win;
           this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
           this.uiManager.winText.style.fontSize = 100;
-          this.uiManager.winText.text = `WIN ₱${Math.floor(data.total_win)}`;
+          this.uiManager.winText.text = `WIN ₱${Math.floor(data.total_win).toLocaleString()}`;
           this.uiManager.winText.style.fill = 0xffd700;
           this.uiManager.winText.scale.set(0.01);
           gsap.delayedCall(0.35, () => {
@@ -458,6 +468,7 @@ export class SlotMachine {
                   this.uiManager.toggleButtonTheme(true);
                   this.leftTopUI.setTheme(true);
                   this.titleUI.setTheme(true);
+                  this.modelUI.setTheme(true);
                 }, () => {
                   this.running = false;
                   this.uiManager.spinButton.interactive = true;
@@ -477,16 +488,17 @@ export class SlotMachine {
           this.uiManager.spinButton.interactive = false;
           this.uiManager.spinButton.alpha = 0.5;
           gsap.delayedCall(1, () => {
-            this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(this.sessionWins)}`;
+            this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(this.sessionWins).toLocaleString()}`;
             this.uiManager.winText.style.fill = 0x00ff00;
             this.uiManager.winText.scale.set(0.01);
             gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(1)" });
             gsap.delayedCall(2, () => {
-              this.vfxManager.playBlackHoleTransition(false, () => {
+                this.vfxManager.playBlackHoleTransition(false, () => {
                 this.vfxManager.swapTheme(false, this.reels);
                 this.uiManager.toggleButtonTheme(false);
                 this.leftTopUI.setTheme(false);
                 this.titleUI.setTheme(false);
+                this.modelUI.setTheme(false);
                 this.uiManager.winText.text = "";
               }, () => {
                 this.running = false;
@@ -525,6 +537,9 @@ export class SlotMachine {
   ) {
     this.reels.forEach((r) => r.symbols.forEach((s) => { s.tint = 0x555555; s.alpha = 1; }));
 
+    // Track running total During backend cascades
+    let accumulatedWin = 0;
+
     const steps = cascaded.filter((s) => s.win > 0);
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
@@ -551,7 +566,7 @@ export class SlotMachine {
         const globalPos = sprite.getGlobalPosition();
         const localPos = this.uiManager.container.toLocal(globalPos);
         const winText = new Text({
-          text: `₱${Math.floor(perSymbolApplied)}`,
+          text: `₱${Math.floor(perSymbolApplied).toLocaleString()}`,
           style: { fill: 0xffd700, fontSize: 60, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } },
         });
         winText.anchor.set(0.5);
@@ -586,11 +601,17 @@ export class SlotMachine {
       this.clearActiveAnimations();
       await this.animateCascadeDrop(beforeGrid, gridAfterDrop, winningPositions);
       this.reels.forEach((r) => r.symbols.forEach((s) => { s.tint = 0x555555; s.zIndex = 0; s.scale.set((s as any).baseScale || s.scale.x); }));
+
+      // Incrementally update Total Win display for each backend cascade step 
+      const stepPayout = step.win * (step.multiplier ?? 1);
+      accumulatedWin += stepPayout;
+      this.lastSpinWin = accumulatedWin;
+      this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
     }
 
     if (totalWin > 0) {
       this.uiManager.winText.style.fontSize = 100;
-      this.uiManager.winText.text = `WIN ₱${Math.floor(totalWin)}`;
+      this.uiManager.winText.text = `WIN ₱${Math.floor(totalWin).toLocaleString()}`;
       this.uiManager.winText.style.fill = 0xffd700;
       this.uiManager.winText.scale.set(0.01);
       gsap.delayedCall(0.35, () => {
@@ -661,7 +682,7 @@ private setupBackground() {
     this.mainContainer.scale.set(scale);
 
     this.mainContainer.x = screenWidth / 2 + offsetX * scale; 
-    this.mainContainer.y = screenHeight / 2.2 + offsetY * scale;
+    this.mainContainer.y = screenHeight / 2 + offsetY * scale;
 
     if (this.waterBg && this.waterBg.sprite) {
         this.waterBg.sprite.x = screenWidth / 2;
@@ -919,7 +940,6 @@ private setupBackground() {
         
         // NORMAL WINS
         
-        // Cascading flow: play step-by-step "break → drop" before counting total win.
         if (
             CONFIG.ENABLE_CASCADING &&
             cascadeResult.steps.length > 0 &&
@@ -974,11 +994,11 @@ private setupBackground() {
                 if (!isEnteringFreeSpins && scatterCount < 5) {
                     this.uiManager.winText.style.fontSize = 100;
                     if (isJackpot) {
-                        this.uiManager.winText.text = "JACKPOT!!!";
                         this.uiManager.winText.style.fill = 0xff0000;
+                        this.uiManager.winText.text = "JACKPOT!!!";
                     } else {
-                        this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades)}`;
                         this.uiManager.winText.style.fill = 0xffd700;
+                        this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades).toLocaleString()}`;
                     }
                     this.uiManager.winText.scale.set(0.01);
                     gsap.delayedCall(0.35, () => {
@@ -1031,6 +1051,7 @@ private setupBackground() {
                                 this.uiManager.toggleButtonTheme(true);
                                 this.leftTopUI.setTheme(true);
                                 this.titleUI.setTheme(true);
+                                this.modelUI.setTheme(true);
                             },
                             //  Clean up
                             () => {
@@ -1066,7 +1087,7 @@ private setupBackground() {
                     val: this.sessionWins, duration: 3, delay: 1.5, ease: "power1.out", 
                     onStart: () => this.soundManager.playSFX('sfx_totalwin'),   
                     onUpdate: () => {
-                        this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(counter.val)}`;
+                        this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(counter.val).toLocaleString()}`;
                     },
                     onComplete: () => {
                         this.soundManager.stopSFX('sfx_totalwin');
@@ -1081,6 +1102,7 @@ private setupBackground() {
                                     this.uiManager.toggleButtonTheme(false);
                                     this.leftTopUI.setTheme(false);
                                     this.titleUI.setTheme(false);
+                                    this.modelUI.setTheme(false);
                                     this.uiManager.winText.scale.set(0);
                                     this.uiManager.winText.text = "";
                                 },
@@ -1208,6 +1230,9 @@ private setupBackground() {
       
       this.reels.forEach(r => r.symbols.forEach(s => { s.tint = 0x555555; s.alpha = 1; }));
 
+      // Track running total so Total Win text climbs step by step during local cascades
+      let accumulatedWin = 0;
+
       let isJackpot = false;
 
       for (const step of cascadeResult.steps) {
@@ -1221,7 +1246,7 @@ private setupBackground() {
               if (w?.meta?.isJackpot) isJackpot = true;
           });
 
-          // Pop each win group (pairing) one by one; win value only on real symbols, not on wilds
+          // Pop each win group  one by on
           const { multiplier } = step as { multiplier: number };
           const winsInStep = evaluation.wins ?? [];
 
@@ -1262,7 +1287,7 @@ private setupBackground() {
                   const localPos = this.uiManager.container.toLocal(globalPos);
 
                   const winText = new Text({
-                      text: `₱${Math.floor(perSymbolApplied)}`,
+                      text: `₱${Math.floor(perSymbolApplied).toLocaleString()}`,
                       style: {
                           fill: 0xffd700,
                           fontSize: 60,
@@ -1317,6 +1342,11 @@ private setupBackground() {
           this.clearActiveAnimations();
           await this.animateCascadeDrop(beforeGrid, step.gridAfterDrop, evaluation.winningPositions);
 
+          // After each cascade step, incrementally update Total Win text so player sees it grow
+          accumulatedWin += evaluation.totalWin || 0;
+          this.lastSpinWin = accumulatedWin;
+          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+
           // Dim again 
           this.reels.forEach(r => r.symbols.forEach(s => { s.tint = 0x555555; s.zIndex = 0; s.scale.set((s as any).baseScale || s.scale.x); }));
       }
@@ -1331,11 +1361,11 @@ private setupBackground() {
 
           this.uiManager.winText.style.fontSize = 100;
           if (isJackpot) {
-              this.uiManager.winText.text = "JACKPOT!!!";
               this.uiManager.winText.style.fill = 0xff0000;
+              this.uiManager.winText.text = "JACKPOT!!!";
           } else {
-              this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades)}`;
               this.uiManager.winText.style.fill = 0xffd700;
+              this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades).toLocaleString()}`;
           }
           this.uiManager.winText.scale.set(0.01);
           gsap.delayedCall(0.35, () => {

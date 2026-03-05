@@ -6,7 +6,9 @@ export const CONFIG = {
 
     // Global layout offsets 
     SLOT_OFFSET_X: 0,
-    SLOT_OFFSET_Y: 100,
+    SLOT_OFFSET_Y: 0
+,
+
     BACKGROUND_OFFSET_X: 0, 
     REEL_OFFSET_X: -10,      
     REEL_OFFSET_Y:-20,    
@@ -28,7 +30,7 @@ export const CONFIG = {
     CONSOLE_Y: 490,     
     
 
-    // Right-side button column 
+    // Right
     BTN_RIGHT_COLUMN_X: 1100,
     BTN_BUY_FREE_Y: -400,
     BTN_BUY_FREE_SCALE: 0.65,
@@ -39,9 +41,9 @@ export const CONFIG = {
     BTN_AUTO_X: 1100,
     BTN_AUTO_SCALE: 0.7,
 
-    BTN_MENU_X: 893,   
-    BTN_MENU_Y: 578, 
-    BTN_MENU_SCALE: 0.5,
+    BTN_MENU_X: -910,   
+    BTN_MENU_Y: 585, 
+    BTN_MENU_SCALE: 0.6,
 
     // Left
     HAT_X: -1190,
@@ -49,41 +51,63 @@ export const CONFIG = {
     HAT_SCALE: 0.6,
 
     // Title 
-    TITLE_X: -1485,
-    TITLE_Y: -300,
+    TITLE_X: -1350,
+    TITLE_Y: 200,
     TITLE_SCALE: 0.7,
-    TITLE_SHEET_COLS: 11,
-    TITLE_SHEET_ROWS: 11,
-    TITLE_SHEET_FRAMES: 120,
-    TITLE_MAX_WIDTH: 650,
-    TITLE_MAX_HEIGHT: 980,
-    TITLE_ANIM_SPEED: 0.5,
 
-    BTN_MINUS_X: -913,
-    BTN_MINUS_Y: 578,
+    // Model 
+    MODEL_X: -1420,
+    MODEL_Y: -510,
+    MODEL_SCALE: .75,
+   
+
+
+    // TITLE_SHEET_COLS: 11,
+    // TITLE_SHEET_ROWS: 11,
+    // TITLE_SHEET_FRAMES: 120,
+    // TITLE_MAX_WIDTH: 650,
+    // TITLE_MAX_HEIGHT: 980,
+    // TITLE_ANIM_SPEED: 0.5,
+
+
+    //bottom
+    TITLE_LABEL_FILL: 0xffd700,
+    TITLE_LABEL_GLOW: 0xffffff,
+    
+
+    TEXT_TOTALWIN_X: -20,
+    TEXT_TOTALWIN_Y: 595,
+    TOTALWIN_BG_SCALE: 0.6,
+    TOTALWIN_BG_X: -285,
+    TOTALWIN_BG_Y: 585,
+    TITLE_TOTALWIN_X: -65,
+    TITLE_TOTALWIN_Y: 550,
+
+    TEXT_BAL_X: -780,  
+    TEXT_BAL_Y: 595,
+    BALANCE_BG_SCALE: 0.6,
+    BALANCE_BG_X: -830,
+    BALANCE_BG_Y: 585,
+    TITLE_BALANCE_X: -795,
+    TITLE_BALANCE_Y: 560,
+    
+    TITLE_BET_X: 550,
+    TITLE_BET_Y: 560,
+    TEXT_BET_X: 570,     
+    TEXT_BET_Y: 595,
+    BET_BG_SCALE: 0.6,
+    BET_BG_X: 530,
+    BET_BG_Y: 585,
+    
+    BTN_MINUS_X: 450,
+    BTN_MINUS_Y: 590,
     BTN_MINUS_SCALE: 0.5,
 
-    BTN_PLUS_X: -600,
-    BTN_PLUS_Y: 578,     
+    BTN_PLUS_X: 853,
+    BTN_PLUS_Y: 590,     
     BTN_PLUS_SCALE: 0.5,
-    // Text Positions
-    TEXT_TOTALWIN_X: 250,
-    TEXT_TOTALWIN_Y: 585,
-    TOTALWIN_BG_SCALE: 0.6,
-    TOTALWIN_BG_X: 230,
-    TOTALWIN_BG_Y: 585,
 
-    TEXT_BET_X: -830,     
-    TEXT_BET_Y: 585,
-    BET_BG_SCALE: 0.5,
-    BET_BG_X: -845,
-    BET_BG_Y: 585,
-
-    TEXT_BAL_X: 550,  
-    TEXT_BAL_Y: 585,
-    BALANCE_BG_SCALE: 0.6,
-    BALANCE_BG_X: 530,
-    BALANCE_BG_Y: 585,
+   
 
 
 
@@ -172,7 +196,7 @@ export const ASSETS = {
         "wild.png", "sc.png"
     ],
     
-UI: ["border.png", "menu.png", "freespin.png","hat.png", "title.png",
+UI: ["border.png", "menu.png", "freespin.png","hat.png", "title.png","model.png",
         "spinBTN.png", "autoSpin.png", "plus.png", 
         "minus.png", "1.png",
          "vortex.png", "bet.png","balance.png","totalwin.png"],

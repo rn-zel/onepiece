@@ -26,9 +26,9 @@ export type NextSymbolIndex = (reelIndex: number) => number;
  * - Repeat until no wins
  *
  * Step multipliers:
- * - Step 0 (initial grid): 1x
- * - Step 1 (first cascade): 2x
- * - Step 2: 3x
+ * - Step 0  1x
+ * - Step 1  2x
+ * - so on
  */
 export class CascadeEngine {
   private readonly evaluator: WinEvaluator;
@@ -91,7 +91,7 @@ function dropAndFill(grid: (number | null)[][], nextSymbolIndex: NextSymbolIndex
     const col = grid[reel];
     const kept = col.filter((v): v is number => v !== null);
 
-    // Drop: fill from bottom up (row 2 is bottom)
+    // Drop: fill from bbottom up (row 2 is bottom)
     const newCol: number[] = [0, 0, 0];
     let writeRow = 2;
     for (let k = kept.length - 1; k >= 0; k--) {
