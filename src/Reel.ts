@@ -5,7 +5,7 @@ export class Reel {
   container: Container;
   symbols: Sprite[] = [];
   position: number = 0;
-  blur: BlurFilter = new BlurFilter();
+  blur: BlurFilter = new BlurFilter({ strengthX: 0, strengthY: 0 });
   symbolsPerReel: number;
   slotTextures: Texture[];
   symbolSize: number;
@@ -14,6 +14,8 @@ export class Reel {
   cardHeight: number;
   symbolContainer: Container;
   isFreeSpins: boolean = false;
+  targetPosition: number = -1;
+  finalGrid: number[] | null = null;
 
   setSpriteToSymbolIndex(symbol: Sprite, symbolIndex: number) {
       if (symbolIndex === undefined || symbolIndex < 0) return;
@@ -48,6 +50,7 @@ export class Reel {
     this.symbolContainer = new Container();
 
     this.initSymbols();
+    this.symbolContainer.filters = [this.blur];
     this.container.addChild(this.symbolContainer);
   }
 
@@ -107,40 +110,49 @@ export class Reel {
     
     this.symbols.forEach((s, j) => {
       const relativePos = (((this.position + j) % max) + max) % max;
-      s.y = Math.round((relativePos - 1) * symbolHeight);
+      s.y = (relativePos - 1) * symbolHeight; // Remove Math.round to prevent jitter/snapping
       
       const currentLap = Math.floor((this.position + j) / max);
       
       if ((s as any).lap !== currentLap) {
-        s.texture = this.randomTexture();
-        const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
-        const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
-        s.scale.set(scale);
-        (s as any).baseScale = scale; 
+       
+        let primed = false;
+        if (this.finalGrid && this.targetPosition > 0) {
+            const symbolsRemaining = this.targetPosition - (this.position + j);
+         
+            const stopIndex = Math.round(symbolsRemaining);
+            if (stopIndex >= 1 && stopIndex <= 3) {
+                const rowIndex = stopIndex - 1;
+                this.setSpriteToSymbolIndex(s, this.finalGrid[rowIndex]);
+                primed = true;
+            }
+        }
+
+        if (!primed) {
+            s.texture = this.randomTexture();
+            const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+            const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
+            s.scale.set(scale);
+            (s as any).baseScale = scale;
+        }
+
         (s as any).lap = currentLap; 
       }
     });
   }
 
-  /**
-   * Directly assigns a 3-symbol grid [row0, row1, row2] to the reels.
-   * Finds the 3 visible sprites by sorting all sprites by their current y-position
-   * and maps row0=topmost, row1=middle, row2=bottom.
-   * This is guaranteed-correct regardless of reel position math.
-   */
+  
   forceSetGrid(indices: number[]) {
     const symbolHeight = this.symbolSize + this.symbolSpacing;
     
-    // Sort all symbols by their y-position to guarantee ordered array: 
-    //   0=top (above view), 1=row0, 2=row1, 3=row2, 4=bottom (below view)
+
     const sortedSymbols = [...this.symbols].sort((a, b) => a.y - b.y);
 
     for (let row = 0; row < 3; row++) {
-      // The visible rows start at index 1 from the sorted array
       const bestSprite = sortedSymbols[row + 1];
       const targetY = row * symbolHeight;
       
-      bestSprite.y = targetY;
+      bestSprite.y = targetY; 
       this.setSpriteToSymbolIndex(bestSprite, indices[row]);
     }
   }

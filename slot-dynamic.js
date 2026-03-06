@@ -10,85 +10,53 @@ app.use(express.json());
 let playerBalance = 150000;
 let freeSpinCounter = 0;
 
-// FREE SPIN CONFIG           
-const CFG_SPINS_ON_SCATTER  = 5; 
-const CFG_SPINS_ON_BUY      = 5; 
-const CFG_BUY_COST_MULT     = 20; 
+
+//  FREE SPIN CONFIG                
+const CFG_SPINS_ON_SCATTER  = 5;  
+const CFG_SPINS_ON_BUY      = 15;  
+const CFG_BUY_COST_MULT     = 10; 
 const CFG_SCATTER_TRIGGER   = 3;  
 
 
+const SYMBOLS = ["a", "k", "q", "j", "s1", "s2", "s3", "s4", "wild", "sc"];
 
-
-// Change this to true to return the CUSTOM_GRID below on every spin
-const USE_CUSTOM_GRID = true;
-
-// initial grid for normal spins
-const CUSTOM_GRID = [
-    ["s1", "a", "k"],  
-    ["s1", "q", "a"], 
-    ["s1", "j", "k"],  
-    ["s1", "wild", "s1"], 
-    ["s1", "s2", "s3"],   
-];
-
-// FREE SPINS (
-
-const CUSTOM_FREE_SPIN_GRID = [
-    ["sc", "s4", "s3"],   // Reel 0: scatter TOP
-    ["s4", "s3", "s2"],   // Reel 1: no scatter
-    ["s4", "sc", "s2"],   // Reel 2: scatter MIDDLE
-    ["s4", "s3", "s2"],   // Reel 3: no scatter
-    ["s4", "s3", "sc"],   // Reel 4: scatter BOTTOM
-];
-
-// Staged cascade drops for FREE SPIN test grid
-const FREE_SPIN_STAGED_DROPS = [
-    ["s3", "s3", "s3", "s3", "s3"],   
-    ["s2", "s2", "s2", "s2", "s2"],   
-    ["s4", "s4", "s4", "s4", "s4"],   
-];
-
-// Math Engine
-
-function generateRandomGrid(forceScatters = false, isFreeSpin = false) {
-    if (USE_CUSTOM_GRID) {
-        // Return free spin grid when in free spin mode
-        if (isFreeSpin) return JSON.parse(JSON.stringify(CUSTOM_FREE_SPIN_GRID));
-        return JSON.parse(JSON.stringify(CUSTOM_GRID));
-    }
-
+// Dynamic RNG Math Engine
+function generateRandomGrid(forceScatters = false) {
     const grid = [];
     for (let c = 0; c < 5; c++) {
         const col = [];
         for (let r = 0; r < 3; r++) {
+            // Mostly pick normal symbols and rarely wilds
             let symbolOptions = ["a", "k", "q", "j", "s1", "s2", "s3", "s4", "a", "k", "q", "j"];
             if (Math.random() > 0.9) symbolOptions.push("wild");
             if (Math.random() > 0.95) symbolOptions.push("sc");
+            
             col.push(symbolOptions[Math.floor(Math.random() * symbolOptions.length)]);
         }
         grid.push(col);
     }
     
     if (forceScatters) {
-        grid[0][1] = "sc";
-        grid[2][1] = "sc";
-        grid[4][1] = "sc";
+        grid[0][0] = "sc";  
+        grid[2][1] = "sc";  
+        grid[4][2] = "sc";  
     }
     
     return grid;
 }
 
+// Basic 243 Ways Evaluator
 function evaluate243(grid, bet) {
     const SYMBOL_PAYOUTS = {
-        "a": [0,0,1,2,5], 
-        "k": [0,0,1,3,10], 
-        "q": [0,0,2,4,15], 
+        "a": [0,0,1,2,5],
+        "k": [0,0,1,3,10],
+        "q": [0,0,2,4,15],
         "j": [0,0,2,5,20],
-        "s1": [0,0,5,10,30], 
-        "s2": [0,0,10,20,50], 
-        "s3": [0,0,15,30,100], 
+        "s1": [0,0,5,10,30],
+        "s2": [0,0,10,20,50],
+        "s3": [0,0,15,30,100],
         "s4": [0,0,20,50,200],
-        "wild": [0,0,0,0,0], 
+        "wild": [0,0,0,0,0],
         "sc": [0,0,0,0,0] 
     };
 
@@ -155,7 +123,7 @@ function evaluate243(grid, bet) {
 }
 
 function generatePlayResult(betAmount, isFreeSpin = false, forceScatters = false) {
-    const grid = generateRandomGrid(forceScatters, isFreeSpin);
+    const grid = generateRandomGrid(forceScatters);
     const { winnings, win, scatterCount, scatterPositions } = evaluate243(grid, betAmount);
     
     // Trigger Free Spins if 3+ scatters land (not during cascades usually, but on base spin)
@@ -174,7 +142,7 @@ function generatePlayResult(betAmount, isFreeSpin = false, forceScatters = false
     let currentWinnings = winnings;
     let cascadeMultiplier = 1;
 
-    // CASCADE TEST 5+ drops
+    // Loop cascade simulation indefinitely until no new wins exist
     while (currentWinnings.length > 0) {
         let dropPositions = [];
         const nextGrid = JSON.parse(JSON.stringify(currentGrid));
@@ -194,36 +162,16 @@ function generatePlayResult(betAmount, isFreeSpin = false, forceScatters = false
         const uniqueDrops = dropPositions.filter((v, i, a) => a.findIndex(t => (t.column === v.column && t.row === v.row)) === i);
         if (uniqueDrops.length === 0) break;
 
-        // Ordered arrays force a cascade chain
-        //  different  drops for free spins vs normal spins
-        const stagedDrops = isFreeSpin ? FREE_SPIN_STAGED_DROPS : [
-            ["k", "k", "k", "k", "k"],    
-            ["q", "q", "q", "q", "q"],    
-            ["j", "j", "j", "j", "j"],    
-            ["s2", "s2", "s2", "s2", "s2"], 
-            ["s4", "s4", "s4", "s4", "s4"]  
-        ];
-
-        // Gravity Drop: move symbols down and fill empty spots at the top
+        // Gravity Drop
         for (let c = 0; c < 5; c++) {
             let colSymbols = [];
-            // Collect remaining non-null symbols
             for (let r = 0; r < 3; r++) {
                 if (nextGrid[c][r] !== null) colSymbols.push(nextGrid[c][r]);
             }
-            
-            // Fill new random or staged symbols at the top
             while (colSymbols.length < 3) {
-                let newSym = ["a", "k", "q", "j", "s1", "s2", "s3", "s4"][Math.floor(Math.random() * 8)];
-                
-                // If we're forcing the test grid, guarantee the next cascade matches our staged drops
-                if (USE_CUSTOM_GRID && cascadeMultiplier <= stagedDrops.length) {
-                    newSym = stagedDrops[cascadeMultiplier - 1][c];
-                }
-                
+                const newSym = ["a", "k", "q", "j", "s1", "s2", "s3"][Math.floor(Math.random() * 7)];
                 colSymbols.unshift(newSym);
             }
-            // Put it back onto the grid
             for (let r = 0; r < 3; r++) {
                 nextGrid[c][r] = colSymbols[r];
             }
@@ -257,17 +205,24 @@ function generatePlayResult(betAmount, isFreeSpin = false, forceScatters = false
                 triggered: triggeredFreeSpins > 0,
                 added_spins: triggeredFreeSpins
             },
-            slot: { reel: grid, winnings: winnings, cascaded: cascaded },
+            slot: {
+                reel: grid,
+                winnings: winnings,
+                cascaded: cascaded
+            },
             free_spin: freeSpinCounter > 0 ? { count: freeSpinCounter } : null,
             balance: playerBalance,
-            jackpot_prizes: { title: "Slot Jackpot", super: "1000", major: "500", mini: "10" }
+            jackpot_prizes: {
+                title: "Slot Jackpot",
+                super: "1000", major: "500", mini: "10"
+            }
         },
         success: true
     };
 }
 
 
-// API ENDPOINTS
+// --- API ENDPOINTS ---
 
 app.post("/load", (req, res) => {
     // Reset free spin counter on every fresh page load so stale counts don't accumulate
@@ -277,7 +232,10 @@ app.post("/load", (req, res) => {
         data: {
             player: { balance: playerBalance },
             free_spin: freeSpinCounter > 0 ? { count: freeSpinCounter } : null,
-            jackpot_prizes: { title: "Slot Jackpot", super: "1000", major: "500", mini: "10" }
+            jackpot_prizes: {
+                title: "Slot Jackpot",
+                super: "1000", major: "500", mini: "10"
+            }
         }
     });
 });
@@ -300,7 +258,7 @@ app.post("/play-free-game", (req, res) => {
     }
     freeSpinCounter--;
     
-    // Use the last known bet (sent from frontend) or default to 100
+    // Use the bet from the frontend so payouts scale correctly
     const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
     const result = generatePlayResult(bet, true, false); 
     
@@ -317,9 +275,7 @@ app.post("/buy-free-game", (req, res) => {
     playerBalance -= cost;
     freeSpinCounter += CFG_SPINS_ON_BUY;
     
-    // We pass `forceScatters=true` here. Note: If `USE_CUSTOM_GRID` is true, 
-    // it will return the CUSTOM_GRID instead of forcing scatters.
-    const result = generatePlayResult(bet, false, true);
+    const result = generatePlayResult(bet, false, true); // Force scatters
     
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
@@ -328,9 +284,18 @@ app.post("/buy-free-game", (req, res) => {
     res.json(result);
 });
 
+app.post("/jackpot", (req, res) => {
+    playerBalance += 10000;
+    res.json({
+        success: true,
+        data: {
+            win: 10000,
+            balance: playerBalance,
+        }
+    });
+});
+
 app.listen(PORT, () => {
-    console.log(`\n================================================================`);
-    console.log(`DEBUG SLOT API running on http://localhost:${PORT}`);
-    console.log(`  USE_CUSTOM_GRID is set to: ${USE_CUSTOM_GRID}`);
-    console.log(`================================================================\n`);
+    console.log(`Backend Dev API running on http://localhost:${PORT}`);
+    console.log(`Dynamic RNG & 243-Way Math Engine is active.`);
 });

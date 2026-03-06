@@ -24,6 +24,7 @@ export type BackendWinning = {
   hasWild?: boolean;
   direction?: string;
   length: number;
+  positions?: { column: number; row: number }[];
 };
 
 export type BackendCascadeStep = {
@@ -100,9 +101,9 @@ export async function play(bet: number): Promise<BackendPlayData> {
   return out.data;
 }
 
-/** POST /play-free-game – one free spin. */
-export async function playFreeGame(): Promise<BackendPlayData> {
-  const out = await fetchApi<BackendResponse<BackendPlayData>>("/play-free-game", {});
+/** POST /play-free-game – one free spin. Sends bet so backend can compute payouts. */
+export async function playFreeGame(bet: number = 100): Promise<BackendPlayData> {
+  const out = await fetchApi<BackendResponse<BackendPlayData>>("/play-free-game", { bet });
   return out.data;
 }
 

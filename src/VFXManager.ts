@@ -61,12 +61,10 @@ export class VFXManager {
         this.app.stage.addChild(this.blackHole);
     }
 
-    /** Updates vortex and other stage-level VFX to match slot position (call on resize). */
     handleResize() {
         this.updateBlackHolePosition();
     }
 
-    /** Same scale/position formula as SlotMachine.handleResize so vortex and slot stay in sync. */
     private getSlotCenter(): { x: number; y: number; scale: number } {
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;

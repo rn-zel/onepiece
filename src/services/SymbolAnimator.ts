@@ -1,8 +1,9 @@
-import { AnimatedSprite, Spritesheet, Assets, Sprite, Container, Graphics, BlurFilter } from "pixi.js";
+import { AnimatedSprite, Spritesheet, Assets, Sprite, Container } from "pixi.js";
+import { CONFIG } from "../Config";
 import type { SymbolAnimation } from "./SymbolAnimation";
 import symbolsImagePath from '../assets/symbols.png'; 
 import type { Reel } from "../Reel";
-import gsap from "gsap";
+
 
 export class SymbolAnimator implements SymbolAnimation {
     private masterSpritesheet!: Spritesheet;
@@ -82,50 +83,29 @@ export class SymbolAnimator implements SymbolAnimation {
         winContainer.sortableChildren = true;
 
         const trueScale = (staticSprite as any).baseScale || staticSprite.scale.x;
-        // sprite anchor is (0.5, 0): x is horizontally centered, y starts at the top edge.
-        // To center the animation overlay on the symbol, shift down by half the rendered height.
         const renderedHeight = staticSprite.texture.height * trueScale;
 
         const frameHeight = 400;
         const borderOffset = 10;
         const innerHeight = frameHeight - (borderOffset * 2); 
-        const animScale = renderedHeight / innerHeight;
+        const animScale = (renderedHeight / innerHeight) * 1.1;
 
         winContainer.x = staticSprite.x;
         winContainer.y = staticSprite.y + renderedHeight * 0.5;
         winContainer.zIndex = 100;
 
-        // Glow behind the animated sprite — centered at (0,0) of winContainer
-        const glow = new Graphics();
-        glow.circle(0, 0, 180);
-        glow.fill({ color: 0xFFD700 });
-        glow.zIndex = 0;
-        glow.alpha = 0;
-
-        const blur = new BlurFilter();
-        blur.strength = 90;
-        glow.filters = [blur];
-        glow.blendMode = 'add';
-
-        gsap.to(glow, { alpha: 0.5, duration: 0.4, yoyo: true, repeat: -1, ease: "sine.inOut" });
-        gsap.to(glow.scale, { x: 1.3, y: 1.3, duration: 0.5, yoyo: true, repeat: -1, ease: "sine.inOut" });
-
-        winContainer.addChild(glow);
-
-        // Animated symbol — center-anchored to align with glow, scaled to match static sprite width/height
         const animatedSymbol = new AnimatedSprite(textures);
         animatedSymbol.anchor.set(0.5, 0.5);
         animatedSymbol.scale.set(animScale);
         animatedSymbol.x = 0;
         animatedSymbol.y = 0;
         animatedSymbol.zIndex = 1;
-        animatedSymbol.animationSpeed = 0.12;
+        animatedSymbol.animationSpeed = CONFIG.SYMBOL_ANIM_SPEED; 
         animatedSymbol.loop = true;
 
         winContainer.addChild(animatedSymbol);
 
-        // Hide static sprite while animation overlay plays
-        staticSprite.alpha = 0;
+        staticSprite.alpha = 0.3;
 
         reel.container.addChild(winContainer);
         activeAnimations.push(winContainer as any);

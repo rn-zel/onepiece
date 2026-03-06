@@ -1,0 +1,55 @@
+# Slot Machine Math Engine Documentation
+
+This document explains the architecture and mathematics behind the slot machine's backend API ([slot-dynamic.js](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-dynamic.js) and [slot-free.js](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-free.js)).
+
+## 1. 243-Ways Mechanics (Left-To-Right)
+
+The game utilizes a "243-Ways to Win" mechanic. This means that traditional "paylines" do not exist. Instead, a win is triggered if matching symbols land anywhere on adjacent reels, starting exclusively from the leftmost reel (Reel 0).
+
+*   **Left-To-Right Strictness:** Every winning combination **must** begin on Reel 0.
+*   **Ways Calculation:** The total payout for a symbol is multiplied by the number of "Ways." A "Way" is calculated by multiplying the number of winning symbols on each consecutive reel.
+    *   *Example:* If Reel 0 has two "K"s, Reel 1 has one "K", and Reel 2 has two "K"s, the total ways to win for "K" is: `2 * 1 * 2 = 4 Ways`.
+
+## 2. Wilds
+
+The `wild` symbol substitutes for any normal paying symbol to complete a winning combination.
+*   Wilds **cannot** substitute for Scatter ([sc](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/src/SlotMachine.ts#1189-1256)) symbols.
+*   During evaluation, if evaluating the symbol "A", any `wild` found on a reel is temporarily treated as an "A" for the purposes of continuing the Left-To-Right sequence and calculating ways.
+
+## 3. The Evaluate Engine ([evaluate243](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-free.js#55-113))
+
+The core evaluation logic lives in the [evaluate243(grid, bet)](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-free.js#55-113) function. Here is the step-by-step process it follows:
+
+1.  **Extract Base Symbols:** It looks exclusively at Reel 0 (the first column) and finds all unique, non-special symbols (excluding `wild` and [sc](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/src/SlotMachine.ts#1189-1256)). These are the only symbols capable of starting a Left-To-Right winning sequence.
+2.  **Sequence Tracing:** For each unique symbol found in Reel 0:
+    *   It checks Reel 1 for that symbol (or a `wild`).
+    *   If found, it multiplies the `ways` counter and proceeds to Reel 2.
+    *   If **not** found, the sequence breaks immediately. The engine completely stops checking that symbol.
+3.  **Minimum Match Validation:** If the unbroken sequence reached at least Reel 2 (a total length of 3 or more reels), it is declared a valid win.
+4.  **Payout Calculation:**
+    *   The base payout is retrieved from `SYMBOL_PAYOUTS` based on the sequence `length`.
+    *   The final payout is determined by: `BasePayout * Ways * (Bet / 100)`.
+5.  **Position Collection:** The engine scans through the reels that were part of the winning sequence (`length`) and logs the exact `[column, row]` coordinates of the matching symbols and wilds so the frontend knows exactly which tiles to animate and explode.
+
+## 4. Cascades & Gravity Drops
+
+The backend natively simulates infinite cascades inside the [generatePlayResult](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-dynamic.js#107-195) loop:
+
+1.  **Detect Wins:** [evaluate243](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-free.js#55-113) returns the winning symbols and their exact grid coordinates.
+2.  **Destruction:** The engine creates a deep copy of the grid and sets the winning coordinates to `null` (destroying them).
+3.  **Gravity Drop:** For each column, the engine collects all symbols that survived (are not `null`), and lets them "fall" to the bottom of the column.
+4.  **Top-Up:** To fill the empty spaces left at the top of the columns, the engine generates random new symbols (`colSymbols.unshift(newSym)`).
+5.  **Multiplier Increment:** The `cascadeMultiplier` increases by +1.
+6.  **Re-Evaluate:** The newly settled grid is passed back into [evaluate243](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-free.js#55-113). If new wins are found on this new grid, the loop repeats indefinitely until no wins remain.
+
+***
+
+### File Distinctions
+
+There are two API server files provided for different testing environments:
+
+#### [slot-dynamic.js](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-dynamic.js) (Production Simulator)
+This is the standard backend. It uses a True RNG function to generate completely random slot grids on every spin, providing a realistic mathematical simulation of the game's volatility and RTP. It runs infinite, random cascades.
+
+#### [slot-free.js](file:///c:/Users/Trainee/Desktop/BountyRUSH/slot/slot-free.js) (Deterministic Debugger)
+This file is designed for frontend debugging. By setting `USE_CUSTOM_GRID = true`, it disables the initial RNG and serves a hardcoded grid layout. It also utilizes "Staged Drops" during cascades—instead of dropping random symbols during a cascade, it drops pre-determined rows of winning symbols (e.g., 5 'K's followed by 5 'Q's) to guarantee high-multiplier cascade sequences for testing UI elements and multiplier popups.

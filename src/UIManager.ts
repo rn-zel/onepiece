@@ -86,6 +86,7 @@ export class UIManager {
         this.spinButton.x = CONFIG.BTN_SPIN_X;
         this.spinButton.y = CONFIG.BTN_SPIN_Y;
         this.spinButton.interactive = true;
+        this.spinButton.eventMode = "static";
         this.spinButton.cursor = "pointer";
         this.spinButton.on("pointerdown", this.onSpin);
         this.container.addChild(this.spinButton);

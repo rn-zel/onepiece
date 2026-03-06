@@ -1,7 +1,5 @@
-import { Container, AnimatedSprite, Spritesheet, Assets, Sprite } from "pixi.js";
+import { Container, Assets, Sprite } from "pixi.js";
 import { CONFIG } from "../Config";
-import titleSheetPath from "../assets/title.png";
-
 // export class TitleUI {
 //     private container: Container;
 //     private staticSprite: Sprite;

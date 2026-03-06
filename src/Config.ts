@@ -54,6 +54,37 @@ export const CONFIG = {
     TITLE_Y: 200,
     TITLE_SCALE: 0.7,
 
+    // Top 
+    TOP_GRAND_X: 330,
+    TOP_GRAND_Y: -810,
+    TOP_GRAND_SCALE: 0.7,
+    TOP_GRAND_TEXT_X: 420,
+    TOP_GRAND_TEXT_Y: 200,
+    TOP_GRAND_TEXT_COLOR: 0x9C7740,
+    TOP_GRAND_TEXT_SIZE: 60,
+    TOP_GRAND_TEXT_STROKE_COLOR: 0x000000,
+    TOP_GRAND_TEXT_STROKE_WIDTH: 4,
+
+    TOP_MAJOR_X: -180, 
+    TOP_MAJOR_Y: -810,
+    TOP_MAJOR_SCALE: 0.7,
+    TOP_MAJOR_TEXT_X: 380,
+    TOP_MAJOR_TEXT_Y: 200,
+    TOP_MAJOR_TEXT_COLOR: 0x9C7740,
+    TOP_MAJOR_TEXT_SIZE: 60,
+    TOP_MAJOR_TEXT_STROKE_COLOR: 0x000000,
+    TOP_MAJOR_TEXT_STROKE_WIDTH: 4,
+
+    TOP_MINI_X: -680,
+    TOP_MINI_Y: -810,
+    TOP_MINI_SCALE: 0.7,
+    TOP_MINI_TEXT_X: 380,
+    TOP_MINI_TEXT_Y: 200,
+    TOP_MINI_TEXT_COLOR: 0x9C7740,
+    TOP_MINI_TEXT_SIZE: 60,
+    TOP_MINI_TEXT_STROKE_COLOR: 0x000000,
+    TOP_MINI_TEXT_STROKE_WIDTH: 4,
+
     // Model 
     MODEL_X: -1420,
     MODEL_Y: -510,
@@ -115,81 +146,47 @@ export const CONFIG = {
         DEFAULT_TINT: 0xFFFFFF,
         FREE_SPINS_TINT: 0xFFBDD5,
     },
-
-    // MODES
-    WIN_MODE: "WAYS_243" as "PAYLINES" | "WAYS_243",
-    // WIN_MODE: "PAYLINES" as "PAYLINES" | "WAYS_243",
    
-    ENABLE_CASCADING: true,
-
     // Backend
-    USE_BACKEND: false,
     API_BASE_URL: "http://localhost:3000",
-};
+    BUY_COST_MULTIPLIER: 10,
 
+    //  ANIMATION TIMINGS 
+    REEL_SPIN_DURATION: 2.5,       
+    CASCADE_WIN_DELAY: 1.5,        
+    CASCADE_MULT_SPAWN_DELAY: 0.2, 
+    NORMAL_WIN_DELAY: 3.0,         
+    TOTAL_WIN_PANEL_DELAY: 3.5,    
+    WIN_TEXT_POPUP_SPEED: 0.5,     
+    PANEL_POPUP_SPEED: 0.8,        
+    SYMBOL_ANIM_SPEED: 0.09,       
+    REEL_BOUNCE_SPEED: .5,        
+    SYMBOL_DROP_SPEED: 0.3,
+    REEL_BOUNCE_OFFSET: 150,         
+    REEL_MAX_BLUR: 100,              
+    REEL_BLUR_FADE_DIST: 10,
+    WIN_HIGHLIGHT_DELAY: 10,       
+    
+    // PARTICLE EMITTER
+    PARTICLE_ORIGIN_X: 0,         
+    PARTICLE_ORIGIN_Y: 800,          
 
-
-export const PAYOUTS = {
+    // PLAYER DEFAULTS 
     CURRENT_BALANCE: 2000,
     BET_AMOUNT: 100,
-
-    LOW: 0.25,
-    HIGH: 1.25,
-
-    SCATTER_SPINS: 10,
-    SCATTER_REQ: 3,
-    SCATTER_EXTRA: 3,
-
-    MULTI_4: 3,
-    MULTI_5: 10,
-    JACKPOT: 2000,
-
     AUTO_SPIN_LIMIT: Number.POSITIVE_INFINITY,
-    AUTO_SPIN_DELAY: 1500,
-
-    FREE_SPIN_COUNT: 0
+    AUTO_SPIN_DELAY: 1500,       
 };
 
-export const PAYLINES = [
-    [0,0,0,0,0], 
-    [1,1,1,1,1], 
-    [2,2,2,2,2], 
-    [0,1,2,1,0],
-    [2,1,0,1,2],
-    // [2,1,2,1,2],
-    // [1,2,1,2,1],
-    // [0,1,0,1,0],
-    // [1,0,1,0,1]
-];
-
-// export const REEL_BANDS = [
-   
-//     [0,0,0,0,1,1,1,2,2,3,3,4,4,5,6,7,8,9,0,1,2], 
-    
-//     [0,0,0,1,1,1,2,2,3,3,4,4,5,5,6,7,9,0,1,2,3], 
-    
-//     [0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,9,0,1,2], 
-    
-//     [0,0,1,1,2,2,3,3,4,4,5,5,6,7,8,9,0,1,2,3,4], 
-    
-//     [0,0,1,1,2,2,3,4,5,6,7,9,0,1,2,3,4,5,6,7,8]  
-// ];
 
 export const SYMBOL_NAMES = ["a", "k", "q", "j", "s1", "s2", "s3", "s4", "wild", "sc"] as const;
 
 export const SYMBOL_BASE: number[] = [
     0.15, 0.2, 0.25, 0.3,   // a, k, q, j (low)
-    0.5, 1, 1.5, 2, 
-            // s1, s2, s3, s4 (high)
+    0.5, 1, 1.5, 2,       // s1, s2, s3, s4 (high)
 ];
 
 export const ASSETS = {
-    // TEXTURES: [
-    //     "l1.png", "l2.png", "l3.png", "l4.png", "l5.png",
-    //     "h1.png", "h2.png", "h3.png",
-    //     "wild111.png", "scatter.png"
-    // ],
-
     TEXTURES: [
         "a.png", "k.png", "q.png", "j.png",
         "s1.png", "s2.png", "s3.png", "s4.png",
@@ -197,19 +194,10 @@ export const ASSETS = {
     ],
     
 UI: ["border.png", "menu.png", "freespin.png","hat.png", "title.png","model.png",
-        "spinBTN.png", "autoSpin.png", "plus.png", 
+        "spinBTN.png", "autoSpin.png", "plus.png","grand.png","mini.png","major.png", 
         "minus.png", "1.png",
          "vortex.png", "bet.png","balance.png","totalwin.png"],
     
     GIF: ["model1.gif"],
-    VIDEO: ["redlight.mp4"],
-    
-
-    // SPRITE_SHEET: ["queen.json",
-    //     "drag.json", "ship.json", 
-    //     "dblue.json", "blue.json",
-    //     "ore.json","red.json","green.json",
-    //     "wild.json","scat.json"],
-    
-
+    VIDEO: ["redlight.mp4"]
 };
