@@ -119,6 +119,45 @@ export async function jackpot(): Promise<{ win: number; balance: number }> {
 }
 
 /** Convert backend reel (symbol names) to grid of symbol indices. */
+/** * Convert backend reel (symbol names) to grid of symbol indices.
+ * Enforces a Column-Major matrix [reelIndex][rowIndex] required by the Domain.
+ */
 export function backendReelToGrid(reel: BackendReel): number[][] {
-  return reel.map((col) => col.map((name) => symbolNameToIndex(name)));
+  // 1. Map string identifiers to numeric domain indices
+  const indexGrid = reel.map((row) => row.map((name) => symbolNameToIndex(name)));
+
+  let finalGrid: number[][];
+
+  // 2. Validate and Transpose:
+  // If the backend returns Row-Major data (e.g., 3 arrays of 5 elements),
+  // transpose it into Col-Major data (5 arrays of 3 elements).
+  if (indexGrid.length > 0 && indexGrid[0].length > indexGrid.length) {
+    const transposedGrid: number[][] = [];
+    const numCols = indexGrid[0].length;
+    const numRows = indexGrid.length;
+
+    for (let c = 0; c < numCols; c++) {
+      transposedGrid[c] = [];
+      for (let r = 0; r < numRows; r++) {
+        transposedGrid[c][r] = indexGrid[r][c];
+      }
+    }
+    finalGrid = transposedGrid;
+  } else {
+    finalGrid = indexGrid;
+  }
+
+  // ─── DEBUG ────────────────────────────────────────────────────────
+  const NAMES = ["a","k","q","j","s1","s2","s3","s4","wild","sc"];
+  console.group("🎰 backendReelToGrid");
+  console.log("Raw reel from backend (each entry = one column [r0,r1,r2]):");
+  reel.forEach((col, i) => console.log(`  Reel ${i}: ${col.join(", ")}`));
+  console.log("Mapped to indices + final grid [reel][row]:");
+  finalGrid.forEach((col, i) =>
+    console.log(`  Reel ${i}: [${col.join(", ")}]  →  ${col.map(n => NAMES[n] ?? "?").join(" | ")}`)
+  );
+  console.groupEnd();
+  // ─────────────────────────────────────────────────────────────────
+
+  return finalGrid;
 }

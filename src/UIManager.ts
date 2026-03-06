@@ -362,5 +362,15 @@ export class UIManager {
         if (this.balancebg) this.balancebg.tint = tintColor;
         if (this.totalWinbg) this.totalWinbg.tint = tintColor;
 
+        if (isFreeSpins) {
+            this.autoSpinButton.visible = false;
+            this.buyFreeSpinButton.visible = false;
+            this.betAmountText.eventMode = 'none';  
+        } else {
+            this.autoSpinButton.visible = true;
+            this.buyFreeSpinButton.visible = true;
+            this.betAmountText.eventMode = 'static'; 
+        }
+
     }
 }

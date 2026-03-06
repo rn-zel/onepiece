@@ -6,8 +6,7 @@ export const CONFIG = {
 
     // Global layout offsets 
     SLOT_OFFSET_X: 0,
-    SLOT_OFFSET_Y: 0
-,
+    SLOT_OFFSET_Y: 60,
 
     BACKGROUND_OFFSET_X: 0, 
     REEL_OFFSET_X: -10,      
@@ -21,7 +20,7 @@ export const CONFIG = {
     SYMBOL_MARGIN: 20,
     
     REELS_COUNT: 5,
-    MACHINE_SCALE: .75,
+    MACHINE_SCALE: .73,
 
     MASK_PX: 30,
     MASK_PY: 35,
@@ -124,7 +123,7 @@ export const CONFIG = {
     ENABLE_CASCADING: true,
 
     // Backend
-    USE_BACKEND: true,
+    USE_BACKEND: false,
     API_BASE_URL: "http://localhost:3000",
 };
 
@@ -176,11 +175,12 @@ export const PAYLINES = [
 //     [0,0,1,1,2,2,3,4,5,6,7,9,0,1,2,3,4,5,6,7,8]  
 // ];
 
-export const SYMBOL_NAMES = ["A", "K", "Q", "J", "S1", "S2", "S3", "S4"] as const;
+export const SYMBOL_NAMES = ["a", "k", "q", "j", "s1", "s2", "s3", "s4", "wild", "sc"] as const;
 
 export const SYMBOL_BASE: number[] = [
-    0.15, 0.2, 0.25, 0.3,   // A, K, Q, J (low)
-    0.5, 1, 1.5, 2,         // S1, S2, S3, S4 (high)
+    0.15, 0.2, 0.25, 0.3,   // a, k, q, j (low)
+    0.5, 1, 1.5, 2, 
+            // s1, s2, s3, s4 (high)
 ];
 
 export const ASSETS = {

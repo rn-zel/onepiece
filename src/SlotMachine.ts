@@ -41,7 +41,7 @@ export class SlotMachine {
   reels: Reel[] = [];
   activeAnimations: AnimatedSprite[] = [];
 
-  // Game State
+  // Domain State
   slotTextures: Texture[];
   backgroundTexture: Texture;
   balance: number = PAYOUTS.CURRENT_BALANCE;
@@ -59,8 +59,13 @@ export class SlotMachine {
   lightning: LightningBorder = new LightningBorder();
   starfield: Starfield;
 
- private symbolAnimator: SymbolAnimation;
-    waterBg: any;
+  private symbolAnimator: SymbolAnimation;
+  waterBg: any;
+
+  private winPanel!: Container;
+  private winPanelBg!: Graphics;
+  private bonusPanel!: Container;
+  private bonusPanelBg!: Graphics;
 
   constructor(
       app: Application, 
@@ -76,7 +81,6 @@ export class SlotMachine {
     this.starfield = starfield;
     this.waterBg = waterBg;
     
-    // Save injected service
     this.symbolAnimator = symbolAnimator;
     
     this.soundManager.init();
@@ -87,7 +91,6 @@ export class SlotMachine {
     this.mainContainer.addChild(this.backgroundContainer);
     this.mainContainer.addChild(this.reelContainer);
 
-    // Layering: background < model < reels < UI
     this.backgroundContainer.zIndex = 0;
     this.reelContainer.zIndex = 10;
 
@@ -112,7 +115,9 @@ export class SlotMachine {
     this.uiManager.container.zIndex = 100;
     this.mainContainer.addChild(this.uiManager.container);
 
-    // Domain win evaluation
+    this.createWinPanel();
+    this.createBonusPanel();
+
     const paytable = new ConfigPaytable();
     this.paylineEvaluator = new PaylineWinEvaluator(paytable);
     this.waysEvaluator = new Ways243WinEvaluator(paytable);
@@ -130,7 +135,6 @@ export class SlotMachine {
     this.uiManager.container.addChild(this.leftTopUI.getContainer());
     this.uiManager.container.addChild(this.titleUI.getContainer());
     
-    //  UI starts in non-free-spins THEME
     this.leftTopUI.setTheme(false);
     this.titleUI.setTheme(false);
     this.modelUI.setTheme(false);
@@ -140,7 +144,6 @@ export class SlotMachine {
     this.vfxManager.setupBlackHole();
     this.setupBetInput(); 
 
-    // Sync initial UI text
     this.uiManager.updateBetTextDisplay(`₱${this.betAmount}`);
     this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
 
@@ -148,14 +151,23 @@ export class SlotMachine {
     window.addEventListener("resize", () => this.handleResize());
     this.waterBg.play();
 
-    // BACKEND MODE START
     if (CONFIG.USE_BACKEND) {
       SlotApi.setSlotApiBaseUrl(CONFIG.API_BASE_URL);
       void this.loadFromBackend();
     }
   }
 
-  /* balance and free spinfrom backend */
+  // --- DOMAIN DATA NORMALIZATION ---
+  /**
+   * Translates incoming backend matrices into the Col-Major layout [reel][row]
+   * required by the PixiJS execution layer. Protects against transposition mismatch.
+   */
+  private normalizeBackendGrid(rawGrid: number[][]): number[][] {
+      // SlotApi.backendReelToGrid already transposes the grid to Col-Major ([reel][row])
+      // so this function just passes it through to prevent a double-transposition.
+      return rawGrid;
+  }
+
   private async loadFromBackend() {
     try {
       const data = await SlotApi.load();
@@ -163,13 +175,12 @@ export class SlotMachine {
       this.bonusSpins = data.free_spin?.count ?? 0;
       this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
     } catch (e) {
-      console.error("Backend load failed:", e);
+      console.error("Backend load exception:", e);
     }
   }
 
   private openBuyFreeSpinsModal() {
-    if (this.running) return;
-    if (this.vfxManager.isFreeSpinsTheme) return;
+    if (this.running || this.vfxManager.isFreeSpinsTheme) return;
 
     const cost = this.betAmount * 10;
     if (!CONFIG.USE_BACKEND && this.balance < cost) return;
@@ -180,10 +191,8 @@ export class SlotMachine {
   }
 
   private async confirmBuyFreeSpins() {
-    if (this.running) return;
-    if (this.vfxManager.isFreeSpinsTheme) return;
+    if (this.running || this.vfxManager.isFreeSpinsTheme) return;
 
-    // Purchased result
     let purchasedGrid: number[][] | null = null;
     let purchasedBalance: number | null = null;
     let purchasedFreeSpins: number | null = null;
@@ -196,7 +205,6 @@ export class SlotMachine {
       purchasedBalance = this.balance;
       purchasedFreeSpins = this.bonusSpins;
       
-      //  Generate a fresh random grid 
       purchasedGrid = [];
       for (let i = 0; i < this.reels.length; i++) {
           const col = [];
@@ -210,9 +218,9 @@ export class SlotMachine {
         const data = await SlotApi.buyFreeGame(this.betAmount);
         purchasedBalance = data.balance;
         purchasedFreeSpins = data.free_spin?.count ?? 0;
-        purchasedGrid = SlotApi.backendReelToGrid(data.slot.reel);
+        purchasedGrid = this.normalizeBackendGrid(SlotApi.backendReelToGrid(data.slot.reel));
       } catch (e) {
-        console.error("Buy free spins failed:", e);
+        console.error("Transaction exception during feature purchase:", e);
         return;
       }
     }
@@ -221,7 +229,6 @@ export class SlotMachine {
     if (typeof purchasedBalance === "number") this.balance = purchasedBalance;
     if (typeof purchasedFreeSpins === "number") this.bonusSpins = purchasedFreeSpins;
 
-
     this.playOneSpinAnimation(() => {
       this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
       this.playPurchasedScatterIntro();
@@ -229,7 +236,6 @@ export class SlotMachine {
   }
 
   private forceThreeScattersInView(grid: number[][]) {
-   
     const SCATTER_INDEX = 9;
     const WILD_INDEX = 8;
 
@@ -246,7 +252,7 @@ export class SlotMachine {
       const col = grid[x];
       if (!col) continue;
       for (let y = 0; y < 3 && scatterCount < 3; y++) {
-        if (col[y] === WILD_INDEX) continue; // NO SCATTER
+        if (col[y] === WILD_INDEX) continue; 
         if (col[y] !== SCATTER_INDEX) {
           col[y] = SCATTER_INDEX;
           scatterCount++;
@@ -267,14 +273,20 @@ export class SlotMachine {
       { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.4, ease: "back.out(2)" }
     );
 
-    gsap.to(this.uiManager.spinButton, {
-        rotation: "+=" + (Math.PI * 100), duration: 2.5, ease: "power4.out",
-        onComplete: () => {
-            gsap.to(this.uiManager.spinButton, {
-                rotation: "+=" + (Math.PI * 2), duration: 15, repeat: -1, ease: "none"
-            });
-        }
-    });
+    if (this.bonusSpins > 0 || this.autoSpinActive) {
+        gsap.to(this.uiManager.spinButton, {
+            rotation: "+=" + (Math.PI * 2), duration: 1.5, repeat: -1, ease: "none", overwrite: "auto"
+        });
+    } else {
+        gsap.to(this.uiManager.spinButton, {
+            rotation: "+=" + (Math.PI * 100), duration: 2.5, ease: "power4.out",
+            onComplete: () => {
+                gsap.to(this.uiManager.spinButton, {
+                    rotation: "+=" + (Math.PI * 2), duration: 15, repeat: -1, ease: "none", overwrite: "auto"
+                });
+            }
+        });
+    }
 
     this.clearActiveAnimations();
 
@@ -296,12 +308,11 @@ export class SlotMachine {
     this.uiManager.spinButton.alpha = 0.6;
     this.uiManager.spinButton.interactive = false;
     this.uiManager.winText.text = "";
+    this.hideWinPanel();
 
     this.reels.forEach((r, i) => {
       const target = r.position + 20 + i * 2;
       const time = 2.0 + i * 0.2;
-      
-      let targetApplied = false;
 
       gsap.to(r, {
         position: target,
@@ -309,22 +320,37 @@ export class SlotMachine {
         ease: "power4.out",
         onUpdate: () => {
           r.updateSymbols();
-          
-      
-          if (targetGrid && !targetApplied && target - r.position < 2) {
-              targetApplied = true;
-              for (let row = 0; row < 3; row++) {
-                  const idx = targetGrid[i][row];
-                  if (typeof idx === "number" && idx >= 0) {
-                      r.setSymbolIndexAtRow(row, idx);
-                  }
-              }
-          }
         },
         onComplete: () => {
+          // Force-assign the backend grid now the reel has physically stopped
+          if (targetGrid) {
+              const NAMES = ["a","k","q","j","s1","s2","s3","s4","wild","sc"];
+              const target = targetGrid[i];
+              console.group(`🎯 Reel ${i} onComplete – applying grid`);
+              console.log(`  Target: [${target.join(", ")}] → ${target.map((n: number) => NAMES[n] ?? "?").join(" | ")}`);
+              r.forceSetGrid(target);
+              // Read back what actually landed in each row
+              const symbolHeight = r.symbolSize + r.symbolSpacing;
+              for (let row = 0; row < 3; row++) {
+                  const sprite = r.getSymbolAtRow(row);
+                  const idx = r.slotTextures.indexOf(sprite.texture);
+                  console.log(`  Row ${row} → sprite.y=${sprite.y.toFixed(0)} expected_y=${(row * symbolHeight).toFixed(0)} idx=${idx} name=${NAMES[idx] ?? "?"} MATCH=${idx === target[row] ? "✅" : "❌ MISMATCH"}`);
+              }
+              console.groupEnd();
+          }
+
+          // Kinetic bounce to hide the snap
+          const originalY = r.container.y;
+          gsap.fromTo(r.container, 
+              { y: originalY + 25 }, 
+              { y: originalY, duration: 0.3, ease: "back.out(1.5)" }
+          );
+
           this.bounceSpecialSymbols(r);
+
           if (i === this.reels.length - 1) {
             if (this.starfield) this.starfield.triggerWarp(false);
+            if (targetGrid) this.applyVisibleGridIndices(targetGrid);
             onDone();
           }
         },
@@ -339,7 +365,6 @@ export class SlotMachine {
     gsap.delayedCall(0.2, () => {
       this.soundManager.playSFX("sfx_maxwin");
 
-      // Animate scatter symbols 
       this.reels.forEach((r) => {
         for (let row = 0; row < PAYOUTS.SCATTER_REQ; row++) {
           const sprite = r.getSymbolAtRow(row);
@@ -354,14 +379,12 @@ export class SlotMachine {
       const spinsText = this.bonusSpins > 0 ? `${this.bonusSpins} SPINS!` : "FREE SPINS!";
       this.uiManager.winText.text = `MEGA BONUS!\n\n${spinsText}`;
       this.uiManager.winText.style.fontSize = 100;
-      this.uiManager.winText.style.fill = 0xffd700;
+      this.uiManager.winText.style.fill = 0xA20A04;
       this.uiManager.winText.scale.set(0.01);
+      this.showBonusPanel();
 
       gsap.to(this.uiManager.winText.scale, {
-        x: 1,
-        y: 1,
-        duration: 2.2,
-        ease: "elastic.out(1, 0.4)",
+        x: 1, y: 1, duration: 2.2, ease: "elastic.out(1, 0.4)",
         onComplete: () => {
               this.vfxManager.playBlackHoleTransition(
                 true,
@@ -371,16 +394,12 @@ export class SlotMachine {
                   this.leftTopUI.setTheme(true);
                   this.titleUI.setTheme(true);
                   this.modelUI.setTheme(true);
-                  this.reels.forEach((r) => {
-                    r.isFreeSpins = true;
-                  });
+                  this.reels.forEach((r) => r.isFreeSpins = true);
                 },
             () => {
-              this.running = false;
+              this.haltUserAutoSpin();
               this.uiManager.spinButton.interactive = true;
               this.uiManager.spinButton.alpha = 1;
-              this.uiManager.winText.text = "";
-              if (this.bonusSpins > 0) this.startSpin();
             }
           );
         },
@@ -388,55 +407,59 @@ export class SlotMachine {
     });
   }
 
-  /** Backend mode */
   private async spinFromBackend(isBonusSpin: boolean) {
-    //disable UI - fetch from the backend
     this.running = true;
     this.uiManager.spinButton.interactive = false;
     this.uiManager.spinButton.alpha = 0.6;
     this.uiManager.winText.text = "";
+    this.hideWinPanel();
     this.lastSpinWin = 0;
     this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
 
     try {
-      // get the result from the backend
       const data = isBonusSpin ? await SlotApi.playFreeGame() : await SlotApi.play(this.betAmount);
       
       this.balance = data.balance;
       this.bonusSpins = data.free_spin?.count ?? 0;
-      const grid = SlotApi.backendReelToGrid(data.slot.reel);
+      
+      // Parse & Transpose Backend Grid
+      const grid = this.normalizeBackendGrid(SlotApi.backendReelToGrid(data.slot.reel));
 
-      // pass the backend grid into animation 
       this.playOneSpinAnimation(async () => {
-        
-        // reels stop 
         this.reels.forEach((r) => { r.isFreeSpins = this.bonusSpins > 0; });
 
         const hasCascade = data.slot.cascaded && data.slot.cascaded.length > 0 && data.slot.cascaded.some((s) => s.win > 0);
         const isEnteringFreeSpins = !!data.free_spin && (data.free_spin.count ?? 0) > 0 && !this.vfxManager.isFreeSpinsTheme;
         const isExitingFreeSpins = this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
 
-        // Cascade Logic
         if (hasCascade) {
           this.running = true;
           this.uiManager.spinButton.interactive = false;
           this.uiManager.spinButton.alpha = 0.6;
           await this.playCascadeSequenceFromBackend(data.slot.cascaded!, data.total_win);
-          this.balance = data.balance;
-          this.sessionWins += data.total_win;
-          this.lastSpinWin = data.total_win;
-          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-          this.running = false;
-          this.uiManager.spinButton.interactive = true;
-          this.uiManager.spinButton.alpha = 1;
-          if (this.autoSpinActive) gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
           return;
         }
 
-        // Normal Win Logic
         if (data.total_win > 0) {
           this.soundManager.playSFX("sfx_win");
           this.reels.forEach((r) => r.symbols.forEach((s) => (s.tint = 0x555555)));
+
+          const evaluator = CONFIG.WIN_MODE === "WAYS_243" ? this.waysEvaluator : this.paylineEvaluator;
+          const evaluation = evaluator.evaluate(grid, this.betAmount);
+
+          this.reels.forEach(r => r.resetBrightness());
+          for (const p of (evaluation.winningPositions || [])) {
+              const reel = this.reels[p.reel];
+              if (!reel) continue;
+              reel.setBrightness(p.row, 2);
+              const symbolSprite = reel.getSymbolAtRow(p.row);
+              if (symbolSprite) {
+                  symbolSprite.zIndex = 100;
+                  reel.container.zIndex = 100;
+                  this.animateSymbolToContainer(symbolSprite, reel);
+              }
+          }
+
           this.sessionWins += data.total_win;
           this.lastSpinWin = data.total_win;
           this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
@@ -444,12 +467,12 @@ export class SlotMachine {
           this.uiManager.winText.text = `WIN ₱${Math.floor(data.total_win).toLocaleString()}`;
           this.uiManager.winText.style.fill = 0xffd700;
           this.uiManager.winText.scale.set(0.01);
-          gsap.delayedCall(0.35, () => {
+          this.showWinPanel(0.8);
+          gsap.delayedCall(0.5 + 0.8, () => {
             gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
           });
         }
 
-        // Entering Free Spins Logic
         if (isEnteringFreeSpins) {
           this.running = true;
           this.uiManager.spinButton.interactive = false;
@@ -460,6 +483,7 @@ export class SlotMachine {
             this.uiManager.winText.style.fontSize = 100;
             this.uiManager.winText.style.fill = 0xffd700;
             this.uiManager.winText.scale.set(0.01);
+            this.showBonusPanel();
             gsap.to(this.uiManager.winText.scale, {
               x: 1, y: 1, duration: 3, ease: "elastic.out(1, 0.4)",
               onComplete: () => {
@@ -470,11 +494,9 @@ export class SlotMachine {
                   this.titleUI.setTheme(true);
                   this.modelUI.setTheme(true);
                 }, () => {
-                  this.running = false;
+                  this.haltUserAutoSpin();
                   this.uiManager.spinButton.interactive = true;
                   this.uiManager.spinButton.alpha = 1;
-                  this.uiManager.winText.text = "";
-                  if (this.bonusSpins > 0) this.startSpin();
                 });
               },
             });
@@ -482,7 +504,6 @@ export class SlotMachine {
           return;
         }
 
-        // Exiting Free Spins Logic
         if (isExitingFreeSpins) {
           this.running = true;
           this.uiManager.spinButton.interactive = false;
@@ -491,6 +512,7 @@ export class SlotMachine {
             this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(this.sessionWins).toLocaleString()}`;
             this.uiManager.winText.style.fill = 0x00ff00;
             this.uiManager.winText.scale.set(0.01);
+            this.showWinPanel();
             gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(1)" });
             gsap.delayedCall(2, () => {
                 this.vfxManager.playBlackHoleTransition(false, () => {
@@ -500,52 +522,65 @@ export class SlotMachine {
                 this.titleUI.setTheme(false);
                 this.modelUI.setTheme(false);
                 this.uiManager.winText.text = "";
+                this.hideWinPanel();
               }, () => {
-                this.running = false;
-                this.uiManager.spinButton.interactive = true;
-                this.uiManager.spinButton.alpha = 1;
                 this.sessionWins = 0;
-                if (this.autoSpinActive) gsap.delayedCall(1, () => this.startSpin());
+                this.resolveSpinCompletion();
               });
             });
           });
           return;
         }
 
-        // If no cascade and no transitions, just clean up and proceed
-        this.running = false;
-        this.uiManager.spinButton.interactive = true;
-        this.uiManager.spinButton.alpha = 1;
-        if (this.autoSpinActive) gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
+        this.resolveSpinCompletion();
 
-      }, grid); // <-- Pass the grid here!
+      }, grid);
 
     } catch (e) {
-      console.error("Backend spin failed:", e);
+      console.error("Backend process failure:", e);
       if (isBonusSpin) this.bonusSpins++; else this.balance += this.betAmount;
       this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-      this.running = false;
-      this.uiManager.spinButton.interactive = true;
-      this.uiManager.spinButton.alpha = 1;
+      this.resolveSpinCompletion();
     }
   }
 
-  /** Run cascade animation from backend  */
   private async playCascadeSequenceFromBackend(
     cascaded: BackendCascadeStep[],
     totalWin: number
   ) {
     this.reels.forEach((r) => r.symbols.forEach((s) => { s.tint = 0x555555; s.alpha = 1; }));
 
-    // Track running total During backend cascades
     let accumulatedWin = 0;
+    this.uiManager.winText.style.fontSize = 100;
+    this.uiManager.winText.style.fill = 0xffd700;
 
     const steps = cascaded.filter((s) => s.win > 0);
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      const winningPositions = step.cascades.map((c) => ({ reel: c.column, row: c.row }));
+      let winningPositions: { reel: number, row: number }[] = [];
+      if (step.cascades && step.cascades.length > 0) {
+          winningPositions = step.cascades.map((c: any) => ({ reel: c.column, row: c.row }));
+      } else {
+          const currentGrid = this.getVisibleGridIndices();
+          const evaluator = CONFIG.WIN_MODE === "WAYS_243" ? this.waysEvaluator : this.paylineEvaluator;
+          const evaluation = evaluator.evaluate(currentGrid, this.betAmount);
+          winningPositions = evaluation.winningPositions || [];
+      }
       if (winningPositions.length === 0) continue;
-      const gridAfterDrop = SlotApi.backendReelToGrid(step.rng);
+
+      const stepPayout = step.win * (step.multiplier ?? 1);
+      accumulatedWin += stepPayout;
+      this.lastSpinWin = accumulatedWin;
+      this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+
+      this.uiManager.winText.text = `WIN ₱${Math.floor(accumulatedWin).toLocaleString()}`;
+      gsap.killTweensOf(this.uiManager.winText.scale);
+      this.uiManager.winText.scale.set(0.6);
+      this.showWinPanel(0.5);
+      gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.5, delay: 0.5, ease: "back.out(2)" });
+
+      // Transpose falling grid
+      const gridAfterDrop = this.normalizeBackendGrid(SlotApi.backendReelToGrid(step.rng));
       const beforeGrid = this.getVisibleGridIndices();
 
       this.reels.forEach((r) => r.resetBrightness());
@@ -558,6 +593,7 @@ export class SlotMachine {
         reel.container.zIndex = 100;
         this.animateSymbolToContainer(sprite, reel);
       }
+
       const perSymbolApplied = step.win / winningPositions.length * step.multiplier;
       for (const pos of winningPositions) {
         const reel = this.reels[pos.reel];
@@ -565,6 +601,7 @@ export class SlotMachine {
         const sprite = reel.getSymbolAtRow(pos.row);
         const globalPos = sprite.getGlobalPosition();
         const localPos = this.uiManager.container.toLocal(globalPos);
+        
         const winText = new Text({
           text: `₱${Math.floor(perSymbolApplied).toLocaleString()}`,
           style: { fill: 0xffd700, fontSize: 60, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } },
@@ -575,6 +612,7 @@ export class SlotMachine {
         this.uiManager.container.addChild(winText);
         gsap.to(winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(2)" });
         gsap.to(winText, { alpha: 0, duration: 1, delay: 1, onComplete: () => winText.destroy() });
+        
         const multText = new Text({
           text: `x${step.multiplier}`,
           style: { fill: 0x00ffcc, fontSize: 50, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } },
@@ -601,30 +639,19 @@ export class SlotMachine {
       this.clearActiveAnimations();
       await this.animateCascadeDrop(beforeGrid, gridAfterDrop, winningPositions);
       this.reels.forEach((r) => r.symbols.forEach((s) => { s.tint = 0x555555; s.zIndex = 0; s.scale.set((s as any).baseScale || s.scale.x); }));
-
-      // Incrementally update Total Win display for each backend cascade step 
-      const stepPayout = step.win * (step.multiplier ?? 1);
-      accumulatedWin += stepPayout;
-      this.lastSpinWin = accumulatedWin;
-      this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
     }
 
     if (totalWin > 0) {
-      this.uiManager.winText.style.fontSize = 100;
-      this.uiManager.winText.text = `WIN ₱${Math.floor(totalWin).toLocaleString()}`;
-      this.uiManager.winText.style.fill = 0xffd700;
-      this.uiManager.winText.scale.set(0.01);
-      gsap.delayedCall(0.35, () => {
-        gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
-      });
+      this.balance += totalWin;
+      this.sessionWins += totalWin;
+      this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+      gsap.to(this.uiManager.winText.scale, { x: 1.15, y: 1.15, duration: 0.15, yoyo: true, repeat: 1 });
     }
+
+    this.resolveSpinCompletion();
   }
-      // BACKEND MODE END
 
-
-
-
-private setupBackground() {
+  private setupBackground() {
     const padding = -10;
     const bg = new Sprite(this.backgroundTexture);
     
@@ -646,7 +673,6 @@ private setupBackground() {
     this.reelContainer.y = CONFIG.REEL_OFFSET_Y; 
     this.reelContainer.sortableChildren = true;
 
-    // Mask reelContainer
     const mask = new Graphics();
     const paddingX = CONFIG.MASK_PX; 
     const paddingY = CONFIG.MASK_PY; 
@@ -687,13 +713,8 @@ private setupBackground() {
     if (this.waterBg && this.waterBg.sprite) {
         this.waterBg.sprite.x = screenWidth / 2;
         this.waterBg.sprite.y = screenHeight / 2;
-
         this.waterBg.sprite.width = window.innerWidth;
         this.waterBg.sprite.height = window.innerHeight;
-        
-        // const bgScaleX = screenWidth / DESIGN_WIDTH;
-        // const bgScaleY = screenHeight / DESIGN_HEIGHT;
-        // this.waterBg.sprite.scale.set(Math.max(bgScaleX, bgScaleY));
     }
 
     this.vfxManager.handleResize();
@@ -752,12 +773,7 @@ private setupBackground() {
 
   private startAutoSpin() {
     if (this.autoSpinActive) {
-      this.autoSpinActive = false;
-      this.autoSpinCount = 0;
-      this.uiManager.autoSpinButton.alpha = 1;
-      
-      gsap.killTweensOf(this.uiManager.autoSpinButton);
-      gsap.to(this.uiManager.autoSpinButton, { rotation: 0, duration: 0.3, ease: "power2.out" });
+      this.haltUserAutoSpin();
     } else {
       this.autoSpinActive = true;
       this.autoSpinCount = PAYOUTS.AUTO_SPIN_LIMIT;
@@ -773,35 +789,36 @@ private setupBackground() {
 
   private autoSpinNext() {
     if (!this.autoSpinActive || this.autoSpinCount <= 0) {
-      this.autoSpinActive = false;
-      this.uiManager.autoSpinButton.alpha = 1;
+      this.haltUserAutoSpin();
       return;
     }
-   if (!this.running && this.balance < this.betAmount && this.bonusSpins === 0) {
-       this.autoSpinActive = false;
-       this.uiManager.autoSpinButton.alpha = 1;
-       alert("Out of Balance!");
+    if (!this.running && this.balance < this.betAmount && this.bonusSpins === 0) {
+       this.haltUserAutoSpin();
+       alert("Insufficient Balance");
        return;
     }
-   if (!this.running){
-    this.autoSpinCount--;
-    this.startSpin();
-   }
+    if (!this.running){
+      this.autoSpinCount--;
+      this.startSpin();
+    }
   }
 
   startSpin() {
     gsap.killTweensOf(this.animateSymbolToContainer); 
     if (this.isEditingBet) this.disableBetEditing();
 
+    if (this.bonusSpins > 0 && !this.running && !this.autoSpinActive) {
+        this.startAutoSpin();
+        return; 
+    }
+
     if (this.running) {
         this.isQuickSpin = true; 
-
         gsap.killTweensOf(this.uiManager.spinButton);
         gsap.fromTo(this.uiManager.spinButton.scale, 
             { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 }, 
             { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.2, ease: "back.out(2)" }
         );
-
         this.reels.forEach(r => {
             gsap.getTweensOf(r).forEach(tween => tween.progress(1));
         });
@@ -817,423 +834,313 @@ private setupBackground() {
       return;
     }
     
-    this.soundManager.playSFX('sfx_spin');
-    
-    if (this.starfield) this.starfield.triggerWarp(true); 
-
-    gsap.killTweensOf(this.uiManager.spinButton);
-    gsap.fromTo(this.uiManager.spinButton.scale, 
-        { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 }, 
-        { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.4, ease: "back.out(2)" }
-    );
-    gsap.to(this.uiManager.spinButton, {
-        rotation: "+=" + (Math.PI * 100), duration: 2.5, ease: "power4.out",
-        onComplete: () => {
-            gsap.to(this.uiManager.spinButton, {
-                rotation: "+=" + (Math.PI * 2), duration: 15, repeat: -1, ease: "none"
-            });
-        }
-    });
-
-    this.activeAnimations.forEach(anim => {
-        gsap.killTweensOf(anim);
-        if (anim.parent) anim.parent.removeChild(anim);
-        anim.destroy();
-    });
-    this.activeAnimations = [];
-    
-    this.reels.forEach(r => {
-        r.container.zIndex = 0;
-        r.resetBrightness(); 
-        r.symbols.forEach(s => {
-            gsap.killTweensOf(s);
-            gsap.killTweensOf(s.scale);
-            s.zIndex = 0;
-            s.alpha = 1;   
-            s.rotation = 0;  
-        });
-    });
-    
-    this.running = true;
     if (!CONFIG.USE_BACKEND) {
-      if (isBonusSpin) {
-        this.bonusSpins--; 
-      } else {
-        this.balance -= this.betAmount;
-      }
+        if (isBonusSpin) {
+            this.bonusSpins--; 
+        } else {
+            this.balance -= this.betAmount;
+        }
     }
 
-    // Reset per-spin win display at spin start.
     this.lastSpinWin = 0;
-    
     this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
     this.uiManager.spinButton.alpha = 0.6;
-    this.uiManager.spinButton.interactive = true; 
+    this.uiManager.spinButton.interactive = false; 
     this.uiManager.winText.text = "";      
+    this.hideWinPanel();
 
-    this.reels.forEach((r, i) => {
-      const target = r.position + 20 + i * 2;
-      const time = 2.0 + i * 0.2; 
+    this.playOneSpinAnimation(() => {
+        void this.reelsComplete();
+    }, null);
+  }
+
+  private async reelsComplete() {
+      this.uiManager.spinButton.alpha = 1;
+      this.running = false;
+      if (this.starfield) this.starfield.triggerWarp(false);
       
-      gsap.to(r, {
-          position: target, duration: time, ease: "power4.out", 
-          onUpdate: () => r.updateSymbols(),
-          onComplete: () => {
-              this.bounceSpecialSymbols(r); 
-              if (i === this.reels.length - 1) {
-                  void this.reelsComplete();
-              }
+      const scatterCount = this.winManager.countScatters(this.reels);
+      const isEnteringFreeSpins = scatterCount >= 3 && !this.vfxManager.isFreeSpinsTheme;
+      const isExitingFreeSpins = this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
+      
+      let sequenceDelay = 0; 
+      const grid = this.getVisibleGridIndices();
+      const evaluator = CONFIG.WIN_MODE === "WAYS_243" ? this.waysEvaluator : this.paylineEvaluator;
+
+      let evaluation = evaluator.evaluate(grid, this.betAmount);
+      let totalWinAllCascades = evaluation.totalWin;
+      let cascadeResult: { steps: any[]; totalWin: number; finalGrid: number[][] } = {
+          steps: [],
+          totalWin: evaluation.totalWin,
+          finalGrid: grid,
+      };
+
+      if (CONFIG.ENABLE_CASCADING) {
+          const { LocalSpinEngine } = await import("./domain/spin/LocalSpinEngine");
+          const engine = new LocalSpinEngine(
+              this.paylineEvaluator,
+              this.waysEvaluator,
+              (reelIndex) => this.randomSymbolIndexForReel(reelIndex),
+              20
+          );
+          const spinResult = await engine.spin({
+              grid,
+              betAmount: this.betAmount,
+              mode: CONFIG.WIN_MODE,
+          });
+          cascadeResult = {
+              steps: spinResult.cascades,
+              totalWin: spinResult.totalWin,
+              finalGrid: spinResult.finalGrid,
+          };
+          totalWinAllCascades = cascadeResult.totalWin;
+          if (spinResult.cascades.length > 0) {
+              evaluation = spinResult.cascades[0].evaluation;
           }
-      });
-    });
-  }
+      }
 
-    private async reelsComplete() {
-        this.uiManager.spinButton.alpha = 1;
-        this.running = false;
-        if (this.starfield) this.starfield.triggerWarp(false);
-        
-        const scatterCount = this.winManager.countScatters(this.reels);
-        const isEnteringFreeSpins = scatterCount >= 3 && !this.vfxManager.isFreeSpinsTheme;
-        const isExitingFreeSpins = this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
-        
-        let sequenceDelay = 0; 
-        const grid = this.getVisibleGridIndices();
-        const evaluator =
-            CONFIG.WIN_MODE === "WAYS_243" ? this.waysEvaluator : this.paylineEvaluator;
+      if (
+          CONFIG.ENABLE_CASCADING &&
+          cascadeResult.steps.length > 0 &&
+          !isEnteringFreeSpins &&
+          !isExitingFreeSpins
+      ) {
+          this.running = true;
+          this.uiManager.spinButton.interactive = false;
+          this.uiManager.spinButton.alpha = 0.6;
+          void this.playCascadeSequence(cascadeResult);
+          return;
+      }
 
-        // Use local spin engine when cascading is enabled; fall back to direct evaluation otherwise.
-        let evaluation = evaluator.evaluate(grid, this.betAmount);
-        let totalWinAllCascades = evaluation.totalWin;
-        let cascadeResult: { steps: any[]; totalWin: number; finalGrid: number[][] } = {
-            steps: [],
-            totalWin: evaluation.totalWin,
-            finalGrid: grid,
-        };
+      if (totalWinAllCascades > 0) {
+          let isJackpot = false;
+          this.soundManager.playSFX('sfx_win');
+          this.reels.forEach(r => r.symbols.forEach(s => s.tint = 0x555555));
 
-        if (CONFIG.ENABLE_CASCADING) {
-            const { LocalSpinEngine } = await import("./domain/spin/LocalSpinEngine");
-            const engine = new LocalSpinEngine(
-                this.paylineEvaluator,
-                this.waysEvaluator,
-                (reelIndex) => this.randomSymbolIndexForReel(reelIndex),
-                20
-            );
-            const spinResult = await engine.spin({
-                grid,
-                betAmount: this.betAmount,
-                mode: CONFIG.WIN_MODE,
-            });
-            cascadeResult = {
-                steps: spinResult.cascades,
-                totalWin: spinResult.totalWin,
-                finalGrid: spinResult.finalGrid,
-            };
-            totalWinAllCascades = cascadeResult.totalWin;
-            if (spinResult.cascades.length > 0) {
-                evaluation = spinResult.cascades[0].evaluation;
-            }
-        }
+          const popEachWin = async () => {
+              for (const w of evaluation.wins) {
+                  const meta = (w as any).meta as any;
+                  if (meta?.isJackpot) isJackpot = true;
 
-        const wins = evaluation.wins;
-        
-        
-        // NORMAL WINS
-        
-        if (
-            CONFIG.ENABLE_CASCADING &&
-            cascadeResult.steps.length > 0 &&
-            !isEnteringFreeSpins &&
-            !isExitingFreeSpins
-        ) {
-            this.running = true;
-            this.uiManager.spinButton.interactive = false;
-            this.uiManager.spinButton.alpha = 0.6;
-            void this.playCascadeSequence(cascadeResult);
-            return;
-        }
-
-        if(totalWinAllCascades > 0) {
-            let isJackpot = false;
-
-            this.soundManager.playSFX('sfx_win');
-            this.reels.forEach(r => r.symbols.forEach(s => s.tint = 0x555555));
-
-            const popEachWin = async () => {
-                for (const w of wins) {
-                    const meta = (w as any).meta as any;
-                    if (meta?.isJackpot) isJackpot = true;
-
-                    this.reels.forEach(r => r.resetBrightness());
-                    const positions = (w.positions ?? []) as { reel: number; row: number }[];
-                    for (const p of positions) {
-                        const reel = this.reels[p.reel];
-                        if (!reel) continue;
-                        reel.setBrightness(p.row, 2);
-                        const symbolSprite = reel.getSymbolAtRow(p.row);
-                        if (symbolSprite) {
-                            symbolSprite.zIndex = 100;
-                            reel.container.zIndex = 100;
-                            this.animateSymbolToContainer(symbolSprite, reel);
-                        }
-                    }
-                    await new Promise<void>(r => gsap.delayedCall(1, r));
-                }
-            };
-            if (!isEnteringFreeSpins && scatterCount < 5) sequenceDelay = 2.0;
-            void popEachWin().then(() => {
-                this.balance += totalWinAllCascades;
-                this.sessionWins += totalWinAllCascades;
-                this.lastSpinWin = totalWinAllCascades;
-                this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-
-                if (CONFIG.ENABLE_CASCADING && cascadeResult.steps.length > 0) {
-                    this.applyVisibleGridIndices(cascadeResult.finalGrid);
-                }
-
-                if (!isEnteringFreeSpins && scatterCount < 5) {
-                    this.uiManager.winText.style.fontSize = 100;
-                    if (isJackpot) {
-                        this.uiManager.winText.style.fill = 0xff0000;
-                        this.uiManager.winText.text = "JACKPOT!!!";
-                    } else {
-                        this.uiManager.winText.style.fill = 0xffd700;
-                        this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades).toLocaleString()}`;
-                    }
-                    this.uiManager.winText.scale.set(0.01);
-                    gsap.delayedCall(0.35, () => {
-                        gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
-                    });
-                }
-            });
-        }
-
-        
-        //  VORTEX IN
-        
-        if (isEnteringFreeSpins) {
-            this.running = true; 
-            this.uiManager.spinButton.interactive = false; 
-            this.uiManager.spinButton.alpha = 0.5;
-
-            gsap.delayedCall(sequenceDelay, () => {
-                this.soundManager.playSFX('sfx_maxwin'); 
-
-                this.bonusSpins += PAYOUTS.SCATTER_SPINS; 
-                this.lastSpinWin = 0;
-                this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-                
-                this.reels.forEach(r => {
-                    for (let row = 0; row < PAYOUTS.SCATTER_REQ; row++) {
-                        const sprite = r.getSymbolAtRow(row);
-                        if (this.slotTextures.indexOf(sprite.texture) === 9) { 
-                            sprite.zIndex = 100;
-                            r.container.zIndex = 100;
-                            this.animateSymbolToContainer(sprite, r);
-                        }
-                    }
-                });
-
-                this.uiManager.winText.text = `MEGA BONUS!\n\n10 SPINS!`;
-                this.uiManager.winText.style.fontSize = 100;
-                this.uiManager.winText.style.fill = 0xffd700;
-                this.uiManager.winText.scale.set(0.01); 
-
-                // Animate text|| Black Hole
-                gsap.to(this.uiManager.winText.scale, { 
-                    x: 1, y: 1, duration: 3, ease: "elastic.out(1, 0.4)",
-                    onComplete: () => {
-                        this.vfxManager.playBlackHoleTransition(
-                            true, 
-                            //  Theme Swap 
-                            () => {
-                                this.vfxManager.swapTheme(true, this.reels);
-                                this.uiManager.toggleButtonTheme(true);
-                                this.leftTopUI.setTheme(true);
-                                this.titleUI.setTheme(true);
-                                this.modelUI.setTheme(true);
-                            },
-                            //  Clean up
-                            () => {
-                                this.running = false;
-                                this.uiManager.spinButton.interactive = true; 
-                                this.uiManager.spinButton.alpha = 1; 
-                                this.uiManager.winText.text = "";
-                                if (this.bonusSpins > 0) this.startSpin();
-                            }
-                        );
-                    }
-                });
-            });
-        } 
-
-        
-        //  VORTEX OUT
-        
-        else if (isExitingFreeSpins) {
-            this.running = true; 
-            this.uiManager.spinButton.interactive = false; 
-            this.uiManager.spinButton.alpha = 0.5;
-            
-            gsap.delayedCall(sequenceDelay, () => {
-                this.uiManager.winText.text = `TOTAL WIN\n₱0`; 
-                this.uiManager.winText.style.fill = 0x00FF00;
-                this.uiManager.winText.scale.set(0.01); 
-
-                gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(1)" });
-
-                const counter = { val: 0 }; 
-                gsap.to(counter, {
-                    val: this.sessionWins, duration: 3, delay: 1.5, ease: "power1.out", 
-                    onStart: () => this.soundManager.playSFX('sfx_totalwin'),   
-                    onUpdate: () => {
-                        this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(counter.val).toLocaleString()}`;
-                    },
-                    onComplete: () => {
-                        this.soundManager.stopSFX('sfx_totalwin');
-                        gsap.delayedCall(1.5, () => {
-                            this.sessionWins = 0;
-                            
-                            this.vfxManager.playBlackHoleTransition(
-                                false, 
-                                //  Theme Swap
-                                () => {
-                                    this.vfxManager.swapTheme(false, this.reels);
-                                    this.uiManager.toggleButtonTheme(false);
-                                    this.leftTopUI.setTheme(false);
-                                    this.titleUI.setTheme(false);
-                                    this.modelUI.setTheme(false);
-                                    this.uiManager.winText.scale.set(0);
-                                    this.uiManager.winText.text = "";
-                                },
-                                () => {
-                                    this.running = false;
-                                    this.uiManager.spinButton.interactive = true; 
-                                    this.uiManager.spinButton.alpha = 1; 
-                                    if (this.autoSpinActive) gsap.delayedCall(1, () => this.startSpin());
-                                }
-                            ); 
-                        });
-                    }
-                });
-            });
-        }
-
-        
-        // AUTOSPIN 
-        
-        else if(this.autoSpinActive && !isEnteringFreeSpins && !isExitingFreeSpins) {
-            setTimeout(() => {
-                this.autoSpinNext();
-            }, PAYOUTS.AUTO_SPIN_DELAY + (sequenceDelay * 1000)); 
-        }
-    }
-
-  startFreeSpins() {
-        console.log("Free spins started!");
-      
-  }
-
-  
-
-    private animateSymbolToContainer(symbolSprite: Sprite, reel: Reel) {
-            const symbolIndex = this.slotTextures.indexOf(symbolSprite.texture);
-            
-            this.symbolAnimator.play(symbolIndex, symbolSprite, reel, this.activeAnimations, this.isQuickSpin);
-        }
-
-    private getVisibleGridIndices(): number[][] {
-        const grid: number[][] = [];
-        for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
-            const reel = this.reels[reelIndex];
-            const col: number[] = [];
-            for (let row = 0; row < 3; row++) {
-                const sprite = reel.getSymbolAtRow(row);
-                col.push(this.slotTextures.indexOf(sprite.texture));
-            }
-            grid.push(col);
-        }
-        return grid;
-    }
-
-    private applyVisibleGridIndices(grid: number[][]) {
-        for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
-            const reel = this.reels[reelIndex];
-            for (let row = 0; row < 3; row++) {
-                const idx = grid[reelIndex]?.[row];
-                if (typeof idx === "number" && idx >= 0) {
-                    reel.setSymbolIndexAtRow(row, idx);
-                }
-            }
-            reel.resetBrightness();
-        }
-    }
-
-    private randomSymbolIndexForReel(reelIndex: number): number {
-        const reel = this.reels[reelIndex];
-        const indices: number[] = [];
-        for (let i = 0; i < this.slotTextures.length; i++) {
-            if (reel?.isFreeSpins && i === 9) continue; // no scatters during free spins
-            indices.push(i);
-        }
-        return indices[Math.floor(Math.random() * indices.length)];
-    }
-
-  private bounceSpecialSymbols(reel: Reel) {
-      for (let row = 0; row < 3; row++) {
-          const sprite = reel.getSymbolAtRow(row);
-          const index = this.slotTextures.indexOf(sprite.texture);
+                  this.reels.forEach(r => r.resetBrightness());
+                  const positions = (w.positions ?? []) as { reel: number; row: number }[];
+                  for (const p of positions) {
+                      const reel = this.reels[p.reel];
+                      if (!reel) continue;
+                      reel.setBrightness(p.row, 2);
+                      const symbolSprite = reel.getSymbolAtRow(p.row);
+                      if (symbolSprite) {
+                          symbolSprite.zIndex = 100;
+                          reel.container.zIndex = 100;
+                          this.animateSymbolToContainer(symbolSprite, reel);
+                      }
+                  }
+                  await new Promise<void>(r => gsap.delayedCall(1, r));
+              }
+          };
           
-          if (index === 8 || index === 9) {
-              const baseScale = (sprite as any).baseScale || 1;
-              sprite.zIndex = 50; 
-              reel.container.zIndex = 50;
+          if (!isEnteringFreeSpins && scatterCount < 5) sequenceDelay = 2.0;
+          
+          void popEachWin().then(() => {
+              this.balance += totalWinAllCascades;
+              this.sessionWins += totalWinAllCascades;
+              this.lastSpinWin = totalWinAllCascades;
+              this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+
+              if (CONFIG.ENABLE_CASCADING && cascadeResult.steps.length > 0) {
+                  this.applyVisibleGridIndices(cascadeResult.finalGrid);
+              }
+
+              if (!isEnteringFreeSpins && scatterCount < 5) {
+                  this.uiManager.winText.style.fontSize = 100;
+                  if (isJackpot) {
+                      this.uiManager.winText.style.fill = 0xff0000;
+                      this.uiManager.winText.text = "JACKPOT!!!";
+                  } else {
+                      this.uiManager.winText.style.fill = 0xffd700;
+                      this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades).toLocaleString()}`;
+                  }
+                  this.uiManager.winText.scale.set(0.01);
+                  this.showWinPanel(0.8);
+                  gsap.delayedCall(0.35 + 0.8, () => {
+                      gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+                  });
+              }
+          });
+      }
+
+      if (isEnteringFreeSpins) {
+          this.running = true; 
+          this.uiManager.spinButton.interactive = false; 
+          this.uiManager.spinButton.alpha = 0.5;
+
+          gsap.delayedCall(sequenceDelay, () => {
+              this.soundManager.playSFX('sfx_maxwin'); 
+              this.bonusSpins += PAYOUTS.SCATTER_SPINS; 
+              this.lastSpinWin = 0;
+              this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
               
-              gsap.to(sprite.scale, {
-                  x: baseScale * 1.1, y: baseScale * 1.1, duration: 0.2, yoyo: true, repeat: 1, delay: 0.1, ease: "back.out(2)",
-                  onComplete: () => {
-                    sprite.scale.set(baseScale);
-                      sprite.zIndex = 0; 
+              this.reels.forEach(r => {
+                  for (let row = 0; row < PAYOUTS.SCATTER_REQ; row++) {
+                      const sprite = r.getSymbolAtRow(row);
+                      if (this.slotTextures.indexOf(sprite.texture) === 9) { 
+                          sprite.zIndex = 100;
+                          r.container.zIndex = 100;
+                          this.animateSymbolToContainer(sprite, r);
+                      }
                   }
               });
+
+              this.uiManager.winText.text = `MEGA BONUS!\n\n10 SPINS!`;
+              this.uiManager.winText.style.fontSize = 100;
+              this.uiManager.winText.style.fill = 0xffd700;
+              this.uiManager.winText.scale.set(0.01); 
+              this.showBonusPanel();
+
+              gsap.to(this.uiManager.winText.scale, { 
+                  x: 1, y: 1, duration: 3, ease: "elastic.out(1, 0.4)",
+                  onComplete: () => {
+                      this.vfxManager.playBlackHoleTransition(
+                          true, 
+                          () => {
+                              this.vfxManager.swapTheme(true, this.reels);
+                              this.uiManager.toggleButtonTheme(true);
+                              this.leftTopUI.setTheme(true);
+                              this.titleUI.setTheme(true);
+                              this.modelUI.setTheme(true);
+                          },
+                          () => {
+                              this.haltUserAutoSpin();
+                              this.uiManager.spinButton.interactive = true; 
+                              this.uiManager.spinButton.alpha = 1; 
+                          }
+                      );
+                  }
+              });
+          });
+          return;
+      } 
+
+      if (isExitingFreeSpins) {
+          this.running = true; 
+          this.uiManager.spinButton.interactive = false; 
+          this.uiManager.spinButton.alpha = 0.5;
+          
+          gsap.delayedCall(sequenceDelay, () => {
+              this.uiManager.winText.text = `TOTAL WIN\n₱0`; 
+              this.uiManager.winText.style.fill = 0x00FF00;
+              this.uiManager.winText.scale.set(0.01); 
+              this.showWinPanel();
+
+              gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 1, ease: "back.out(1)" });
+
+              const counter = { val: 0 }; 
+              gsap.to(counter, {
+                  val: this.sessionWins, duration: 3, delay: 1.5, ease: "power1.out", 
+                  onStart: () => this.soundManager.playSFX('sfx_totalwin'),   
+                  onUpdate: () => {
+                      this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(counter.val).toLocaleString()}`;
+                  },
+                  onComplete: () => {
+                      this.soundManager.stopSFX('sfx_totalwin');
+                      gsap.delayedCall(1.5, () => {
+                          this.sessionWins = 0;
+                          
+                          this.vfxManager.playBlackHoleTransition(
+                              false, 
+                              () => {
+                                  this.vfxManager.swapTheme(false, this.reels);
+                                  this.uiManager.toggleButtonTheme(false);
+                                  this.leftTopUI.setTheme(false);
+                                  this.titleUI.setTheme(false);
+                                  this.modelUI.setTheme(false);
+                                  this.uiManager.winText.scale.set(0);
+                                  this.uiManager.winText.text = "";
+                                  this.hideWinPanel();
+                              },
+                              () => {
+                                  this.resolveSpinCompletion();
+                              }
+                          ); 
+                      });
+                  }
+              });
+          });
+          return;
+      }
+
+      this.resolveSpinCompletion();
+  }
+
+  private resolveSpinCompletion(): void {
+      this.running = false;
+
+      if (this.bonusSpins > 0) {
+          this.uiManager.spinButton.interactive = false;
+          
+          gsap.to(this.uiManager.spinButton, { 
+              rotation: "+=" + (Math.PI * 2), 
+              duration: 1.5, 
+              repeat: -1, 
+              ease: "none", 
+              overwrite: "auto" 
+          });
+          
+          gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => {
+              this.startSpin();
+          });
+          return;
+      }
+
+      if (this.autoSpinActive) {
+          if (this.autoSpinCount > 0) {
+              this.uiManager.spinButton.interactive = false;
+              
+              gsap.to(this.uiManager.spinButton, { 
+                  rotation: "+=" + (Math.PI * 2), 
+                  duration: 1.5, 
+                  repeat: -1, 
+                  ease: "none", 
+                  overwrite: "auto" 
+              });
+
+              gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => {
+                  this.autoSpinNext();
+              });
+              return;
+          } else {
+              this.haltUserAutoSpin();
           }
       }
+
+      this.uiManager.spinButton.interactive = true;
+      this.uiManager.spinButton.alpha = 1;
+      this.haltSpinButtonVisuals();
   }
 
-  private async setupLightning() {
-      await this.lightning.init();
+  private haltUserAutoSpin(): void {
+      this.autoSpinActive = false;
+      this.autoSpinCount = 0;
+      this.uiManager.autoSpinButton.alpha = 1;
       
-      if (this.lightning.sprite) {
-          this.uiManager.container.addChild(this.lightning.sprite);
-          this.lightning.sprite.zIndex = 10; 
-
-          this.lightning.sprite.eventMode = "none";
-      }
+      gsap.killTweensOf(this.uiManager.autoSpinButton);
+      gsap.to(this.uiManager.autoSpinButton, { rotation: 0, duration: 0.3, ease: "power2.out" });
+      this.haltSpinButtonVisuals();
   }
 
-  private clearActiveAnimations() {
-      this.activeAnimations.forEach(anim => {
-          gsap.killTweensOf(anim);
-          if (anim.parent) anim.parent.removeChild(anim);
-          anim.destroy();
-      });
-      this.activeAnimations = [];
-  }
-
-  private tweenToEnd(tween: gsap.core.Tween | gsap.core.Timeline) {
-      return new Promise<void>((resolve) => {
-          tween.eventCallback("onComplete", () => resolve());
-      });
+  private haltSpinButtonVisuals(): void {
+      gsap.killTweensOf(this.uiManager.spinButton);
+      gsap.to(this.uiManager.spinButton, { rotation: 0, duration: 0.3, ease: "power2.out" });
   }
 
   private async playCascadeSequence(cascadeResult: { steps: any[]; totalWin: number; finalGrid: number[][] }) {
-      
       this.reels.forEach(r => r.symbols.forEach(s => { s.tint = 0x555555; s.alpha = 1; }));
 
-      // Track running total so Total Win text climbs step by step during local cascades
       let accumulatedWin = 0;
-
       let isJackpot = false;
+
+      this.uiManager.winText.style.fontSize = 100;
+      this.uiManager.winText.style.fill = 0xffd700;
 
       for (const step of cascadeResult.steps) {
           const evaluation = step.evaluation as { wins: any[]; totalWin: number; winningPositions: { reel: number; row: number }[] };
@@ -1241,12 +1148,20 @@ private setupBackground() {
 
           const beforeGrid = this.getVisibleGridIndices();
 
-          // Detect jackpot in any step 
           evaluation.wins?.forEach((w: any) => {
               if (w?.meta?.isJackpot) isJackpot = true;
           });
 
-          // Pop each win group  one by on
+          accumulatedWin += evaluation.totalWin;
+          this.lastSpinWin = accumulatedWin;
+          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
+
+          this.uiManager.winText.text = `WIN ₱${Math.floor(accumulatedWin).toLocaleString()}`;
+          gsap.killTweensOf(this.uiManager.winText.scale);
+          this.uiManager.winText.scale.set(0.6);
+          this.showWinPanel(0.5);
+          gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.5, delay: 0.5, ease: "back.out(2)" });
+
           const { multiplier } = step as { multiplier: number };
           const winsInStep = evaluation.wins ?? [];
 
@@ -1288,12 +1203,7 @@ private setupBackground() {
 
                   const winText = new Text({
                       text: `₱${Math.floor(perSymbolApplied).toLocaleString()}`,
-                      style: {
-                          fill: 0xffd700,
-                          fontSize: 60,
-                          fontWeight: "bold",
-                          stroke: { color: 0x000000, width: 4 },
-                      },
+                      style: { fill: 0xffd700, fontSize: 60, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } },
                   });
                   winText.anchor.set(0.5);
                   winText.position.set(localPos.x, localPos.y - 20);
@@ -1304,12 +1214,7 @@ private setupBackground() {
 
                   const multText = new Text({
                       text: `x${multiplier}`,
-                      style: {
-                          fill: 0x00ffcc,
-                          fontSize: 50,
-                          fontWeight: "bold",
-                          stroke: { color: 0x000000, width: 4 },
-                      },
+                      style: { fill: 0x00ffcc, fontSize: 50, fontWeight: "bold", stroke: { color: 0x000000, width: 4 } },
                   });
                   multText.anchor.set(0.5);
                   multText.position.set(localPos.x, localPos.y + 5);
@@ -1326,7 +1231,6 @@ private setupBackground() {
 
           await this.tweenToEnd(gsap.to({}, { duration: 0.3 }));
 
-          // Break symbols 
           const breakTweens: gsap.core.Tween[] = [];
           for (const p of evaluation.winningPositions) {
               const reel = this.reels[p.reel];
@@ -1338,49 +1242,239 @@ private setupBackground() {
           }
           await Promise.all(breakTweens.map(t => this.tweenToEnd(t)));
 
-          // Cleanup 
           this.clearActiveAnimations();
           await this.animateCascadeDrop(beforeGrid, step.gridAfterDrop, evaluation.winningPositions);
 
-          // After each cascade step, incrementally update Total Win text so player sees it grow
-          accumulatedWin += evaluation.totalWin || 0;
-          this.lastSpinWin = accumulatedWin;
-          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-
-          // Dim again 
           this.reels.forEach(r => r.symbols.forEach(s => { s.tint = 0x555555; s.zIndex = 0; s.scale.set((s as any).baseScale || s.scale.x); }));
       }
 
-      // Count total win  end of cascade 
       const totalWinAllCascades = cascadeResult.totalWin || 0;
       if (totalWinAllCascades > 0) {
           this.balance += totalWinAllCascades;
           this.sessionWins += totalWinAllCascades;
-          this.lastSpinWin = totalWinAllCascades;
-          this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-
-          this.uiManager.winText.style.fontSize = 100;
+          
           if (isJackpot) {
               this.uiManager.winText.style.fill = 0xff0000;
               this.uiManager.winText.text = "JACKPOT!!!";
+              this.uiManager.winText.scale.set(0.01);
+              gsap.delayedCall(0.35, () => {
+                  gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+              });
           } else {
-              this.uiManager.winText.style.fill = 0xffd700;
-              this.uiManager.winText.text = `WIN ₱${Math.floor(totalWinAllCascades).toLocaleString()}`;
+              gsap.to(this.uiManager.winText.scale, { x: 1.15, y: 1.15, duration: 0.15, yoyo: true, repeat: 1 });
           }
-          this.uiManager.winText.scale.set(0.01);
-          gsap.delayedCall(0.35, () => {
-              gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.8, ease: "back.out(1.7)" });
+      }
+
+      this.resolveSpinCompletion();
+  }
+
+  private animateSymbolToContainer(symbolSprite: Sprite, reel: Reel) {
+      const symbolIndex = this.slotTextures.indexOf(symbolSprite.texture);
+      this.symbolAnimator.play(symbolIndex, symbolSprite, reel, this.activeAnimations, this.isQuickSpin);
+  }
+
+  private getVisibleGridIndices(): number[][] {
+      const grid: number[][] = [];
+      for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
+          const reel = this.reels[reelIndex];
+          const col: number[] = [];
+          for (let row = 0; row < 3; row++) {
+              const sprite = reel.getSymbolAtRow(row);
+              col.push(this.slotTextures.indexOf(sprite.texture));
+          }
+          grid.push(col);
+      }
+      return grid;
+  }
+
+  private applyVisibleGridIndices(grid: number[][]) {
+      for (let reelIndex = 0; reelIndex < this.reels.length; reelIndex++) {
+          const reel = this.reels[reelIndex];
+          for (let row = 0; row < 3; row++) {
+              const idx = grid[reelIndex]?.[row];
+              if (typeof idx === "number" && idx >= 0) {
+                  reel.setSymbolIndexAtRow(row, idx);
+              }
+          }
+          reel.resetBrightness();
+      }
+  }
+
+  private randomSymbolIndexForReel(reelIndex: number): number {
+      const reel = this.reels[reelIndex];
+      const indices: number[] = [];
+      for (let i = 0; i < this.slotTextures.length; i++) {
+          if (reel?.isFreeSpins && i === 9) continue; 
+          indices.push(i);
+      }
+      return indices[Math.floor(Math.random() * indices.length)];
+  }
+
+  private bounceSpecialSymbols(reel: Reel) {
+      for (let row = 0; row < 3; row++) {
+          const sprite = reel.getSymbolAtRow(row);
+          const index = this.slotTextures.indexOf(sprite.texture);
+          
+          if (index === 8 || index === 9) {
+              const baseScale = (sprite as any).baseScale || 1;
+              sprite.zIndex = 50; 
+              reel.container.zIndex = 50;
+              
+              gsap.to(sprite.scale, {
+                  x: baseScale * 1.1, y: baseScale * 1.1, duration: 0.2, yoyo: true, repeat: 1, delay: 0.1, ease: "back.out(2)",
+                  onComplete: () => {
+                    sprite.scale.set(baseScale);
+                      sprite.zIndex = 0; 
+                  }
+              });
+          }
+      }
+  }
+
+  private async setupLightning() {
+      await this.lightning.init();
+      if (this.lightning.sprite) {
+          this.uiManager.container.addChild(this.lightning.sprite);
+          this.lightning.sprite.zIndex = 10; 
+          this.lightning.sprite.eventMode = "none";
+      }
+  }
+
+  private createWinPanel() {
+      const parent = this.uiManager.winText.parent;
+      if (!parent) return;
+
+      const originalPosition = this.uiManager.winText.position.clone();
+
+      this.winPanel = new Container();
+      this.winPanel.zIndex = 150;
+      this.winPanel.position.copyFrom(originalPosition);
+      this.winPanel.visible = false;
+      this.winPanel.alpha = 0;
+
+      const bgWidth = 900;
+      const bgHeight = 260;
+
+      this.winPanelBg = new Graphics()
+          .roundRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 40)
+          .fill({ color: 0x000000, alpha: 0.92 })
+          .stroke({ color: 0xffd700, width: 6, alpha: 0.9 });
+
+      const inner = new Graphics()
+          .roundRect(-bgWidth / 2 + 10, -bgHeight / 2 + 10, bgWidth - 20, bgHeight - 20, 30)
+          .fill({ color: 0x000000, alpha: 0.9 });
+
+      this.winPanel.addChild(this.winPanelBg);
+      this.winPanel.addChild(inner);
+
+      parent.removeChild(this.uiManager.winText);
+      this.uiManager.winText.position.set(0, 0);
+      this.winPanel.addChild(this.uiManager.winText);
+
+      parent.addChild(this.winPanel);
+  }
+
+  private createBonusPanel() {
+      const parent = this.uiManager.container;
+      if (!this.winPanel) return;
+
+      this.bonusPanel = new Container();
+      this.bonusPanel.zIndex = 160;
+      this.bonusPanel.position.copyFrom(this.winPanel.position);
+      this.bonusPanel.visible = false;
+      this.bonusPanel.alpha = 0;
+
+      const bgWidth = 1800;
+      const bgHeight = 980;
+
+      this.bonusPanelBg = new Graphics()
+          .roundRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 48)
+          .fill({ color: 0x000000, alpha: 0.95 })
+          .stroke({ color: 0x000000, width: 7, alpha: 1 });
+
+      const innerGlow = new Graphics()
+          .roundRect(-bgWidth / 2 + 12, -bgHeight / 2 + 12, bgWidth - 24, bgHeight - 24, 32)
+          .fill({ color: 0x000000, alpha: 0.95 });
+
+      this.bonusPanel.addChild(this.bonusPanelBg);
+      this.bonusPanel.addChild(innerGlow);
+
+      parent.addChild(this.bonusPanel);
+  }
+
+  private showWinPanel(delay: number = 0) {
+      if (!this.winPanel) return;
+      if (this.bonusPanel) this.bonusPanel.visible = false;
+
+      if (this.uiManager.winText.parent !== this.winPanel) {
+          this.uiManager.winText.parent?.removeChild(this.uiManager.winText);
+          this.uiManager.winText.position.set(0, 0);
+          this.winPanel.addChild(this.uiManager.winText);
+      }
+      this.winPanel.visible = true;
+      this.winPanel.alpha = 0;
+      this.winPanel.scale.set(0.8);
+
+      gsap.killTweensOf(this.winPanel);
+      gsap.killTweensOf(this.winPanel.scale);
+
+      gsap.to(this.winPanel, { alpha: 1, duration: 0.25, delay: delay, ease: "power2.out" });
+      gsap.to(this.winPanel.scale, { x: 1, y: 1, duration: 0.5, delay: delay, ease: "back.out(1.7)" });
+  }
+
+  private hideWinPanel() {
+      const panels: Container[] = [];
+      if (this.winPanel) panels.push(this.winPanel);
+      if (this.bonusPanel) panels.push(this.bonusPanel);
+
+      panels.forEach(panel => {
+          gsap.killTweensOf(panel);
+          gsap.killTweensOf(panel.scale);
+
+          gsap.to(panel, {
+              alpha: 0, duration: 0.2, ease: "power2.in",
+              onComplete: () => {
+                  panel.visible = false;
+                  panel.scale.set(1);
+              },
           });
+      });
+  }
+
+  private showBonusPanel() {
+      if (!this.bonusPanel) return;
+      if (this.winPanel) this.winPanel.visible = false;
+
+      if (this.uiManager.winText.parent !== this.bonusPanel) {
+          this.uiManager.winText.parent?.removeChild(this.uiManager.winText);
+          this.uiManager.winText.position.set(0, 0);
+          this.bonusPanel.addChild(this.uiManager.winText);
       }
 
-      // Restore interactivity and continue autos
-      this.running = false;
-      this.uiManager.spinButton.interactive = true;
-      this.uiManager.spinButton.alpha = 1;
+      this.bonusPanel.visible = true;
+      this.bonusPanel.alpha = 0;
+      this.bonusPanel.scale.set(0.8);
 
-      if (this.autoSpinActive) {
-          gsap.delayedCall(PAYOUTS.AUTO_SPIN_DELAY / 1000, () => this.autoSpinNext());
-      }
+      gsap.killTweensOf(this.bonusPanel);
+      gsap.killTweensOf(this.bonusPanel.scale);
+
+      gsap.to(this.bonusPanel, { alpha: 1, duration: 0.25, ease: "power2.out" });
+      gsap.to(this.bonusPanel.scale, { x: 1, y: 1, duration: 0.6, ease: "back.out(2)" });
+  }
+
+  private clearActiveAnimations() {
+      this.activeAnimations.forEach(anim => {
+          gsap.killTweensOf(anim);
+          if (anim.parent) anim.parent.removeChild(anim);
+          anim.destroy();
+      });
+      this.activeAnimations = [];
+  }
+
+  private tweenToEnd(tween: gsap.core.Tween | gsap.core.Timeline) {
+      return new Promise<void>((resolve) => {
+          tween.eventCallback("onComplete", () => resolve());
+      });
   }
 
   private setSpriteToSymbolIndex(reel: Reel, sprite: Sprite, symbolIndex: number) {
@@ -1430,7 +1524,6 @@ private setupBackground() {
           const keptValues = keptOldRows.map((r) => beforeGrid[reelIndex][r]);
           const keptCount = keptValues.length;
 
-          // Map kept symbols to their new rows after compaction
           for (let k = 0; k < keptCount; k++) {
               const oldRow = keptOldRows[k];
               const newRow = 3 - keptCount + k;
@@ -1444,7 +1537,6 @@ private setupBackground() {
               );
           }
 
-          // Use removed sprites to spawn new symbols above and drop them into empty rows at the top
           const newRowsCount = 3 - keptCount;
           for (let newRow = 0; newRow < newRowsCount; newRow++) {
               const sprite = rowSprites[removedRows[newRow] ?? removedRows[0]];
@@ -1459,10 +1551,6 @@ private setupBackground() {
       }
 
       await Promise.all(tweens.map((t) => this.tweenToEnd(t)));
-
       this.applyVisibleGridIndices(afterGrid);
   }
-
-   
-
 }

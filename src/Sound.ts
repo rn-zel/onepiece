@@ -2,8 +2,9 @@ import { sound } from '@pixi/sound';
 
 export class SoundManager {
     private currentBGM: string | null = null;
+    private pendingBGM: boolean | null = null; // null = not requested yet
+    private audioUnlocked = false;
 
-    
     private readonly tracks = {
         bgm_normal: {url: 'sounds/bg1.mp3', volume: 5},
         bgm_free: {url: 'sounds/phonk.mp3', volume: 4},     
@@ -14,12 +15,10 @@ export class SoundManager {
         sfx_maxwin: {url: 'sounds/bonusspin.mp3', volume: 5},
         sfx_totalwin: {url: 'sounds/totalwin.mp3', volume: 10},
         sfx_thunder: {url: 'sounds/thunder.mp3', volume: 3},
-        
     };
 
     constructor() {
-        
-        sound.volumeAll = 1; 
+        sound.volumeAll = 1;
     }
 
     public init() {
@@ -32,15 +31,39 @@ export class SoundManager {
                 });
             }
         }
-}
-    
+
+        // Unlock audio on the first user gesture — required by browsers
+        const unlock = () => {
+            if (this.audioUnlocked) return;
+            this.audioUnlocked = true;
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('touchstart', unlock);
+            document.removeEventListener('keydown', unlock);
+
+            // Play the BGM that was requested before the gesture
+            if (this.pendingBGM !== null) {
+                this._startBGM(this.pendingBGM);
+                this.pendingBGM = null;
+            }
+        };
+        document.addEventListener('click', unlock);
+        document.addEventListener('touchstart', unlock);
+        document.addEventListener('keydown', unlock);
+    }
 
     public playBGM(isFreeSpin: boolean) {
+        if (!this.audioUnlocked) {
+            // Store intent — will be played once audio is unlocked
+            this.pendingBGM = isFreeSpin;
+            return;
+        }
+        this._startBGM(isFreeSpin);
+    }
+
+    private _startBGM(isFreeSpin: boolean) {
         const nextBGM = isFreeSpin ? 'bgm_free' : 'bgm_normal';
-        
         if (this.currentBGM === nextBGM) return;
 
-        // Fade out  and fade in 
         if (this.currentBGM) {
             sound.stop(this.currentBGM);
         }
@@ -50,6 +73,7 @@ export class SoundManager {
     }
 
     public playSFX(alias: keyof typeof this.tracks) {
+        if (!this.audioUnlocked) return; // Skip SFX before first gesture too
         sound.play(alias);
     }
 

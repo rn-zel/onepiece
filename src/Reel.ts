@@ -15,6 +15,20 @@ export class Reel {
   symbolContainer: Container;
   isFreeSpins: boolean = false;
 
+  setSpriteToSymbolIndex(symbol: Sprite, symbolIndex: number) {
+      if (symbolIndex === undefined || symbolIndex < 0) return;
+      const texture = this.slotTextures[symbolIndex];
+      if (!texture) return;
+
+      symbol.texture = texture;
+      const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+      const scale = Math.min(availableWidth / texture.width, this.symbolSize / texture.height);
+      symbol.scale.set(scale);
+      (symbol as any).baseScale = scale;
+      symbol.alpha = 1;
+      symbol.rotation = 0;
+  }
+
   constructor(
     container: Container,
     textures: Texture[],
@@ -108,10 +122,34 @@ export class Reel {
     });
   }
 
+  /**
+   * Directly assigns a 3-symbol grid [row0, row1, row2] to the reels.
+   * Finds the 3 visible sprites by sorting all sprites by their current y-position
+   * and maps row0=topmost, row1=middle, row2=bottom.
+   * This is guaranteed-correct regardless of reel position math.
+   */
+  forceSetGrid(indices: number[]) {
+    const symbolHeight = this.symbolSize + this.symbolSpacing;
+    
+    // Sort all symbols by their y-position to guarantee ordered array: 
+    //   0=top (above view), 1=row0, 2=row1, 3=row2, 4=bottom (below view)
+    const sortedSymbols = [...this.symbols].sort((a, b) => a.y - b.y);
+
+    for (let row = 0; row < 3; row++) {
+      // The visible rows start at index 1 from the sorted array
+      const bestSprite = sortedSymbols[row + 1];
+      const targetY = row * symbolHeight;
+      
+      bestSprite.y = targetY;
+      this.setSpriteToSymbolIndex(bestSprite, indices[row]);
+    }
+  }
+
   getSymbolAtRow(row: number): Sprite {
-    const targetY = row * (this.symbolSize + this.symbolSpacing);
-    const found = this.symbols.find(s => Math.abs(s.y - targetY) < 50);
-    return found || this.symbols[0];
+    // Sort all symbols by their y-position to guarantee ordered array
+    const sortedSymbols = [...this.symbols].sort((a, b) => a.y - b.y);
+    // The visible rows start at index 1 from the sorted array
+    return sortedSymbols[row + 1] || this.symbols[0];
   }
 
   getSymbolTexture(row: number): Texture {
@@ -120,17 +158,7 @@ export class Reel {
 
   setSymbolIndexAtRow(row: number, symbolIndex: number) {
     const symbol = this.getSymbolAtRow(row);
-    const texture = this.slotTextures[symbolIndex];
-    if (!texture) return;
-
-    symbol.texture = texture;
-
-    const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
-    const scale = Math.min(availableWidth / texture.width, this.symbolSize / texture.height);
-    symbol.scale.set(scale);
-    (symbol as any).baseScale = scale;
-
-    symbol.alpha = 1;
+    this.setSpriteToSymbolIndex(symbol, symbolIndex);
   }
   
   setBrightness(row: number, brightness: number) {
