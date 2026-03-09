@@ -117,4 +117,11 @@ export class BuyFreeSpinsModal {
         this.modalContainer.destroy({ children: true });
         this.modalContainer = null;
     }
+
+    public handleResize(width: number, height: number): void {
+        if (this.modalContainer) {
+            this.modalContainer.x = width / 2;
+            this.modalContainer.y = height / 2;
+        }
+    }
 }

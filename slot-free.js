@@ -7,20 +7,23 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-let playerBalance = 150000;
+let playerBalance = 10000;
 let freeSpinCounter = 0;
 
-// FREE SPIN CONFIG           
-const CFG_SPINS_ON_SCATTER  = 5; 
-const CFG_SPINS_ON_BUY      = 5; 
-const CFG_BUY_COST_MULT     = 20; 
-const CFG_SCATTER_TRIGGER   = 3;  
+// ─────────────────────────────────────────────────────────────
+// CONFIG — must stay in sync with Config.ts on the frontend
+// ─────────────────────────────────────────────────────────────
+const CFG_SPINS_ON_SCATTER  = 2;  // Must match frontend "10 SPINS!" text
+const CFG_SPINS_ON_BUY      = 5;  // Must match BuyFreeSpinsModal display
+const CFG_BUY_COST_MULT     = 10;  // Must match Config.ts BUY_COST_MULTIPLIER
+const CFG_SCATTER_TRIGGER   = 3;
 
 
 
 
-// Change this to true to return the CUSTOM_GRID below on every spin
-const USE_CUSTOM_GRID = true;
+// Set to true ONLY for debugging specific grid layouts.
+// Use slot-dynamic.js for real random gameplay testing.
+const USE_CUSTOM_GRID = false;
 
 // initial grid for normal spins
 const CUSTOM_GRID = [
@@ -79,17 +82,18 @@ function generateRandomGrid(forceScatters = false, isFreeSpin = false) {
 }
 
 function evaluate243(grid, bet) {
+    // Indices: [0-of, 1-of, 2-of, 3-of, 4-of, 5-of]
     const SYMBOL_PAYOUTS = {
-        "a": [0,0,1,2,5], 
-        "k": [0,0,1,3,10], 
-        "q": [0,0,2,4,15], 
-        "j": [0,0,2,5,20],
-        "s1": [0,0,5,10,30], 
-        "s2": [0,0,10,20,50], 
-        "s3": [0,0,15,30,100], 
-        "s4": [0,0,20,50,200],
-        "wild": [0,0,0,0,0], 
-        "sc": [0,0,0,0,0] 
+        "a":    [0, 0, 0,  1,  2,   5],
+        "k":    [0, 0, 0,  1,  3,  10],
+        "q":    [0, 0, 0,  2,  4,  15],
+        "j":    [0, 0, 0,  2,  5,  20],
+        "s1":   [0, 0, 0,  5, 10,  30],
+        "s2":   [0, 0, 0, 10, 20,  50],
+        "s3":   [0, 0, 0, 15, 30, 100],
+        "s4":   [0, 0, 0, 20, 50, 200],
+        "wild": [0, 0, 0,  0,  0,   0],
+        "sc":   [0, 0, 0,  2,  5,  20],  // Scatter pays on 3/4/5 (multiplied by bet/100)
     };
 
     let winnings = [];
@@ -141,7 +145,7 @@ function evaluate243(grid, bet) {
         }
     }
     
-    // Evaluate Scatters (anywhere on reels)
+    // Evaluate Scatters (anywhere on reels, no payline rule)
     let scatterPositions = [];
     for (let c = 0; c < 5; c++) {
         for (let r = 0; r < 3; r++) {
@@ -151,6 +155,24 @@ function evaluate243(grid, bet) {
         }
     }
     
+    // Scatter payout (3/4/5 anywhere)
+    if (scatterPositions.length >= CFG_SCATTER_TRIGGER) {
+        const scTable = SYMBOL_PAYOUTS["sc"] || [];
+        const scPayout = (scTable[scatterPositions.length] ?? 0) * (bet / 100);
+        if (scPayout > 0) {
+            totalWin += scPayout;
+            winnings.push({
+                symbol: "sc",
+                payout: scPayout,
+                ways: 1,
+                hasWild: false,
+                direction: "scatter",
+                length: scatterPositions.length,
+                positions: scatterPositions,
+            });
+        }
+    }
+
     return { winnings, win: totalWin, scatterCount: scatterPositions.length, scatterPositions };
 }
 
@@ -158,13 +180,14 @@ function generatePlayResult(betAmount, isFreeSpin = false, forceScatters = false
     const grid = generateRandomGrid(forceScatters, isFreeSpin);
     const { winnings, win, scatterCount, scatterPositions } = evaluate243(grid, betAmount);
     
-    // Trigger Free Spins if 3+ scatters land (not during cascades usually, but on base spin)
     let triggeredFreeSpins = 0;
-    // Only add spins on organic scatter hits. Skip when called from /buy-free-game
-    // (forceScatters=true) to avoid double-counting the buy grant.
+    let retriggered = false;
+
+    // Only grant spins on organic hits — not on forceScatters (buy) to avoid double-counting
     if (scatterCount >= CFG_SCATTER_TRIGGER && !forceScatters) {
         triggeredFreeSpins = CFG_SPINS_ON_SCATTER;
         freeSpinCounter += triggeredFreeSpins;
+        if (isFreeSpin) retriggered = true; // Scatter hit during free spins = retrigger
     }
 
     let total_win = win;
@@ -247,90 +270,132 @@ function generatePlayResult(betAmount, isFreeSpin = false, forceScatters = false
     }
 
     return {
+        success: true,
         data: {
-            win: win,
-            total_win: total_win,
+            win,
+            total_win,
             is_free_spin: isFreeSpin,
             scatters: {
                 count: scatterCount,
                 positions: scatterPositions,
                 triggered: triggeredFreeSpins > 0,
-                added_spins: triggeredFreeSpins
+                added_spins: triggeredFreeSpins,
+                retriggered,
             },
-            slot: { reel: grid, winnings: winnings, cascaded: cascaded },
-            free_spin: freeSpinCounter > 0 ? { count: freeSpinCounter } : null,
+            slot: { reel: grid, winnings, cascaded },
+            free_spin: freeSpinCounter > 0
+                ? { count: freeSpinCounter, retrigger: retriggered, add: triggeredFreeSpins || null }
+                : null,
             balance: playerBalance,
-            jackpot_prizes: { title: "Slot Jackpot", super: "1000", major: "500", mini: "10" }
+            jackpot_prizes: { grand: 200000, major: 50000, mini: 1000 },
         },
-        success: true
     };
 }
 
 
-// API ENDPOINTS
+// ─────────────────────────────────────────────────────────────
+// API Endpoints
+// ─────────────────────────────────────────────────────────────
 
-app.post("/load", (req, res) => {
-    // Reset free spin counter on every fresh page load so stale counts don't accumulate
+/** GET /config — expose server config so frontend can stay in sync */
+app.get("/config", (_req, res) => {
+    res.json({
+        success: true,
+        data: {
+            buy_cost_multiplier: CFG_BUY_COST_MULT,
+            spins_on_scatter:    CFG_SPINS_ON_SCATTER,
+            spins_on_buy:        CFG_SPINS_ON_BUY,
+            scatter_trigger:     CFG_SCATTER_TRIGGER,
+            use_custom_grid:     USE_CUSTOM_GRID,
+        },
+    });
+});
+
+/** POST /load — initial player state */
+app.post("/load", (_req, res) => {
     freeSpinCounter = 0;
     res.json({
         success: true,
         data: {
             player: { balance: playerBalance },
-            free_spin: freeSpinCounter > 0 ? { count: freeSpinCounter } : null,
-            jackpot_prizes: { title: "Slot Jackpot", super: "1000", major: "500", mini: "10" }
-        }
+            free_spin: null,
+            jackpot_prizes: { grand: 200000, major: 50000, mini: 1000 },
+        },
     });
 });
 
+/** POST /play — main game spin */
 app.post("/play", (req, res) => {
     const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
+
+    if (playerBalance < bet) {
+        return res.status(400).json({ success: false, message: "Insufficient balance." });
+    }
+
     playerBalance -= bet;
-    
+    const forceJackpot = req.body?.force_jackpot === true;
     const result = generatePlayResult(bet, false, false);
     
+    if (forceJackpot) {
+        result.data.jackpot_hit = true;
+        result.data.jackpot_type = "grand";
+        result.data.total_win += 200000;
+    }
+
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
-    
     res.json(result);
 });
 
+/** POST /play-free-game — consume one free spin */
 app.post("/play-free-game", (req, res) => {
     if (freeSpinCounter <= 0) {
         return res.status(400).json({ success: false, message: "No free spins remaining." });
     }
     freeSpinCounter--;
-    
-    // Use the last known bet (sent from frontend) or default to 100
     const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
-    const result = generatePlayResult(bet, true, false); 
-    
+    const result = generatePlayResult(bet, true, false);
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
-    result.data.free_spin = { count: freeSpinCounter };
-    
+    result.data.free_spin = {
+        count: freeSpinCounter,
+        retrigger: result.data.scatters.retriggered,
+        add: result.data.scatters.retriggered ? CFG_SPINS_ON_SCATTER : null,
+    };
     res.json(result);
 });
 
+/** POST /buy-free-game — purchase free spins */
 app.post("/buy-free-game", (req, res) => {
     const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
     const cost = bet * CFG_BUY_COST_MULT;
+
+    if (playerBalance < cost) {
+        return res.status(400).json({ success: false, message: "Insufficient balance to buy free spins." });
+    }
+
     playerBalance -= cost;
     freeSpinCounter += CFG_SPINS_ON_BUY;
-    
-    // We pass `forceScatters=true` here. Note: If `USE_CUSTOM_GRID` is true, 
-    // it will return the CUSTOM_GRID instead of forcing scatters.
     const result = generatePlayResult(bet, false, true);
-    
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
-    result.data.free_spin = { count: freeSpinCounter };
-    
+    result.data.free_spin = { count: freeSpinCounter, retrigger: false, add: CFG_SPINS_ON_BUY };
     res.json(result);
 });
 
+/** POST /jackpot — debug jackpot claim */
+app.post("/jackpot", (_req, res) => {
+    const jackpotWin = 200000;
+    playerBalance += jackpotWin;
+    res.json({ success: true, data: { win: jackpotWin, balance: playerBalance, type: "grand" } });
+});
+
 app.listen(PORT, () => {
-    console.log(`\n================================================================`);
-    console.log(`DEBUG SLOT API running on http://localhost:${PORT}`);
-    console.log(`  USE_CUSTOM_GRID is set to: ${USE_CUSTOM_GRID}`);
-    console.log(`================================================================\n`);
+    console.log(`\n==========================================================`);
+    console.log(`  BountyRUSH — Debug/Test Slot Backend (slot-free.js)`);
+    console.log(`  Running on   http://localhost:${PORT}`);
+    console.log(`  USE_CUSTOM_GRID : ${USE_CUSTOM_GRID}  (set true for fixed test grids)`);
+    console.log(`  Buy Cost Mult   : x${CFG_BUY_COST_MULT}`);
+    console.log(`  Free Spins      : ${CFG_SPINS_ON_SCATTER} on scatter / ${CFG_SPINS_ON_BUY} on buy`);
+    console.log(`==========================================================\n`);
 });

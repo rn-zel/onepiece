@@ -1,116 +1,115 @@
-# System Overview
+# 🏛️ System Architecture Overview
 
-This codebase implements a 5×3 video slot using **PixiJS + TypeScript** on the client and an optional **Node/Express** backend (`slot-free.js`) to drive game math. The system relies on a strictly typed **Domain-Driven Design (DDD)** architecture to keep Pixi/UI code separate from game state logic and backend I/O.
+> This document details the **Domain-Driven Design (DDD)** and **SOLID** principles guiding the BountyRUSH Slot Engine. It serves as the definitive reference for the system's bounded contexts and data flow.
+
+This codebase implements a 5x3 WebGL video slot engine using **PixiJS + TypeScript** on the client. To ensure the system remains testable, scalable, and isolated from UI churn, it relies on a strictly typed architectural pattern. The PixiJS presentation layer is decoupled entirely from the game state logic and backend I/O.
 
 ---
 
-## Complete Project Directory Structure
+## 🗂️ Complete Enterprise Directory Structure
+
+The structure reflects the Dependency Rule: *Source code dependencies must point inward, toward higher-level policies (the Domain).*
 
 ```text
 C:\Users\Trainee\Desktop\BountyRUSH\slot\
 |-- package.json
 |-- tsconfig.json
 |-- vite.config.ts
-|-- slot-free.js                 # Backend Node Simulator Server
+|-- slot-free.js                 # Local Back-End RNG Simulator
 |
 \---src
-    |-- main.ts                  # Application Entry Point & Preloader
-    |-- SlotMachine.ts           # Root Dependency Injection / Composition Root
+    |-- main.ts                  # Application Entry & Preloader
+    |-- SlotMachine.ts           # The Composition Root (Dependency Injection Hub)
     |
-    +---application              # Application Layer (Orchestration rules)
+    +---application              # [Flow] Orchestration Layer
     |   \---orchestrators
-    |           CascadeOrchestrator.ts   # Sequence logic for symbol breaking/dropping
-    |           SpinOrchestrator.ts      # Core mechanical layout for spinning/blurring
+    |           CascadeOrchestrator.ts   # Avalanche sequence driver
+    |           SpinOrchestrator.ts      # Core mechanic timeline (spin, blur, stop)
     |
-    +---domain                   # Core Enterprise Logic (No Pixi.js direct logic)
+    +---domain                   # [Core] Enterprise Logic (NO PixiJS ALLOWED)
     |   +---constants
-    |   |       Config.ts        # Hardcoded Rules & Mathematical Parameters
+    |   |       Config.ts        # Hardcoded constraints & Math configuration
     |   +---entities
-    |   |       Reel.ts          # Core Reel Entity mapping math logic to visual columns
+    |   |       Reel.ts          # Physical reel column mapping
     |   \---models
-    |           GameTypes.ts     # Global system Types & Interfaces
+    |           GameTypes.ts     # Global system Data Transfer Objects (DTOs)
     |
-    +---infrastructure           # External System Drivers (I/O, Network, Browser Audio)
+    +---infrastructure           # [I/O] External System Boundaries
     |   +---api
-    |   |       slotApi.ts       # HTTP Client wrapper interacting with slot-free.js
+    |   |       slotApi.ts       # HTTP Client adapter (Anticorruption Layer)
     |   \---audio
-    |           SoundManager.ts  # Singleton interfacing with Howler/HTML5 audio context
+    |           SoundManager.ts  # WebAudio/Howler wrapper
     |
-    \---presentation             # Presentation Layer (Strictly Visual Rendering)
-        +---animation
-        |       LightningBorder.ts
-        |       Starfield.ts
-        |       SymbolAnimation.ts
+    \---presentation             # [UI] PixiJS Rendering & Post-Processing
+        +---animation            # Stateful sprite managers
         |       SymbolAnimator.ts
-        |       WaterBg.ts
+        |       Starfield.ts
         |
-        +---ui
-        |       BuyFreeSpinsModal.ts
-        |       lefttop.ts
-        |       model.ts
-        |       title.ts
-        |       top.ts
+        +---ui                   # Static HUD and Input Controls
         |       UIManager.ts
         |       WinPresenter.ts
+        |       HelpModal.ts
         |
-        \---vfx                  # Particle and Shader Post-Processing Effects
+        \---vfx                  # Shaders & Particles
                 ParticleEmitter.ts
                 VFXManager.ts
 ```
 
 ---
 
-## Layer Responsibilities and Components
+## 🏗️ Layer Responsibilities
+
+Each layer in the system has a strictly defined, singular responsibility, adhering to the Single Responsibility Principle (SRP).
 
 ### 1. Presentation Layer (`src/presentation/**`)
-
-Everything related to PixiJS rendering, UI buttons, HTML DOM alignment, and visual timelines.
-
-- **`animation/`**: Stateful sprite managers. E.g., `SymbolAnimator.ts` implements the `SymbolAnimation` interface and controls the GSAP timeline that overlays animated winning symbols. `Starfield.ts` and `WaterBg.ts` control environment graphics.
-- **`ui/`**: Static menus and controls. `UIManager.ts` delegates to smaller modular files (`BuyFreeSpinsModal.ts`, `WinPresenter.ts`, `lefttop.ts`) to manage HUD overlay updates, listening to the core machine events.
-- **`vfx/`**: Ephemeral physics visuals. `ParticleEmitter.ts` handles Pixi.js emitter nodes. `VFXManager.ts` acts as a repository for global visual state overrides like transitions and black holes.
+Everything related to PixiJS rendering, user input, HTML DOM alignment, and visual timelines.
+- **Rules:** 
+  - Cannot evaluate logical wins or mutate player balances.
+  - Exposes public methods like `showWinPanel()` or `emitGlow()` that higher layers call.
+- **Components:** `UIManager` routes clicks outward to delegates. `VFXManager` manages global visual state overrides (like a Blackhole transition).
 
 ### 2. Application Layer (`src/application/**`)
-
-Orchestrates sequences between multiple layers. The orchestrators control the *order of operations* when interacting with game entities.
-
-- **`SpinOrchestrator.ts`**: Coordinates turning the user's Spin command into physical Reel tweens, injecting motion blur, and detecting when all wheels settle using Promises.
-- **`CascadeOrchestrator.ts`**: Receives winning layout grids, tells `VFXManager` to draw particles, tells `SymbolAnimator` to play win clips, and then tweens out winning symbols so new mathematical models can fall into place.
+Orchestrates the *order of operations* between multiple layers. The orchestrators receive intent, interact with the Domain, and output commands to the Presentation and Infrastructure layers.
+- **Rules:**
+  - Cannot contain presentation implementation details (e.g., drawing `Graphics`).
+  - Cannot contain pure math or probability calculations.
+- **Components:** `SpinOrchestrator` determines *when* a reel stops. `CascadeOrchestrator` tells `VFXManager` *when* to draw particles after a resolved win drops.
 
 ### 3. Domain Layer (`src/domain/**`)
-
-The business logic rulebook. It does not import presentation specifics, relying on interfaces and primitive types.
-
-- **`models/GameTypes.ts`**: Global primitive Data Transfer Objects.
-- **`constants/Config.ts`**: Layout parameters, API endpoints, multiplier logic, auto-spin configurations.
-- **`entities/Reel.ts`**: A dedicated entity linking physical reel grid positions, logical mappings, and tracking their target symbols.
+The heart of the system. It contains the business logic rulebook and does not import presentation specifics, relying entirely on interfaces and primitive types.
+- **Rules:**
+  - Absolute zero knowledge of `pixi.js`, `window`, or `document`.
+  - Driven by the Open/Closed Principle (OCP)—behaviors can be extended via new interfaces without touching existing logic.
+- **Components:** `GameTypes.ts` defines the exact shape of a `GridPosition` or an incoming `CascadeStep`. `Reel.ts` links physical grid positions to their targeting logic.
 
 ### 4. Infrastructure Layer (`src/infrastructure/**`)
-
-Connecting the slot machine to the outside world.
-
-- **`api/slotApi.ts`**: Maps HTTP parameters mapped out in `slot-free.js` to strictly-typed Promise results. Translates raw JSON back into local Domain models like the physical `Grid`.
-- **`audio/SoundManager.ts`**: Maps text triggers (`sfx_spin`) to underlying sound system invocations securely, allowing sound pools to be muted system-wide.
-
----
-
-## End-to-End Spin Flow (DDD Driven)
-
-1. **User Action (Presentation):** The user clicks the SPIN button injected in `UIManager`.
-2. **State Validation (Root):** `SlotMachine.startSpin()` intercepts the call, checking if `domain/Config.ts` allows spinning (e.g., verifying `balance >= betAmount`).
-3. **Network Call (Infrastructure):** `SlotMachine` fires an HTTP query via `slotApi.ts` to `slot-free.js` to roll the RNG server payload.
-4. **Mechanical Action (Application):** While downloading, `SpinOrchestrator` applies motion blur and infinite rotation to the `Reel` entities.
-5. **Data Merge (Application):** `slotApi.ts` resolves successfully with a target matrix. `SlotMachine` commands `SpinOrchestrator` to forcefully target the final `Reel` indices.
-6. **Win Sequence (Application):** `SpinOrchestrator` yields. If there are wins, `SlotMachine` tasks `CascadeOrchestrator` to fade/destroy symbols while delegating sound commands to `SoundManager` (Infrastructure).
+Connecting the core game to the outside world.
+- **Rules:**
+  - Isolates external protocols (HTTP, WebAudio) from the core logic. 
+- **Components:** `slotApi.ts` acts as an Anticorruption Layer, translating raw JSON payloads from the Node backend into strictly-typed `Domain` models.
 
 ---
 
-## Runtime Modes
+## 🔄 End-to-End Spin Flow (DDD Driven)
 
-The slot can run in two modes, controlled manually by `CONFIG`:
+The flow exactly mirrors the Dependency Inversion Principle (DIP). The `SlotMachine` composition root delegates tasks across boundaries via injected interfaces.
 
-- **Testing Mode** (`slot-free.js`)
-  - The local `slot-free.js` express server drives random configurations based on pre-set static data logic loops. Excellent for testing layouts rapidly without internet connection.
+1. **User Action [Presentation]:** The user triggers an interaction via the `UIManager.spinButton`.
+2. **Evaluation [Root]:** `SlotMachine.startSpin()` acts as the controller, validating `Config` and ensuring the action is legally playable (`balance >= betAmount`).
+3. **I/O Request [Infrastructure]:** `SlotMachine` fires an async query via `slotApi.ts` to `slot-free.js` to roll the RNG payload.
+4. **Visual Anticipation [Application -> Presentation]:** While waiting, `SpinOrchestrator` continuously pushes motion blur and transforms onto the physical `Reel` entities.
+5. **Payload Translation [Infrastructure -> Domain]:** `slotApi.ts` resolves effectively with a target matrix. The JSON is mutated into local Data Transfer Objects (DTOs).
+6. **Execution [Application]:** `SlotMachine` commands `SpinOrchestrator` to forcefully target the final `Reel` indices.
+7. **Resolution Sequence [Application -> Presentation/Infrastructure]:** `SpinOrchestrator` yields. If the payload indicates wins, `SlotMachine` tasks `CascadeOrchestrator` to coordinate the breakdown and slide effects, simultaneously delegating audio commands to the `SoundManager` (Infrastructure).
 
-- **Real Backend Mode** 
-  - Simply remap `API_BASE_URL` in `src/domain/constants/Config.ts` to point toward a production RNG mathematics backend. The frontend will dynamically ingest payouts perfectly as long as the HTTP interfaces defined in `slotApi.ts` are met.
+---
+
+## ⚙️ Runtime Modes
+
+The system architecture allows the math engine to be entirely decoupled from the client via endpoints.
+
+- **Local Mathematics Simulator Mode** (`slot-free.js`)
+  - The local Node.js express server drives random configurations based on pre-set loops. Ideal for offline feature testing and rapid animation iteration.
+
+- **Production API Mode** 
+  - Map `API_BASE_URL` in `src/domain/constants/Config.ts` to a live, regulated RNG mathematics backend. The frontend seamlessly ingests payouts as long as the Integration Contract defined in `slotApi.ts` is satiated.

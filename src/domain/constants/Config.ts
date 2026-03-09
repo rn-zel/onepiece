@@ -152,7 +152,15 @@ export const CONFIG = {
     BUY_COST_MULTIPLIER: 10,
 
     //  ANIMATION TIMINGS 
-    REEL_SPIN_DURATION: 2.5,       
+    REEL_SPIN_DURATION: 1.5,       
+    REEL_STAGGER_DELAY: 0.2,
+    TURBO_TIME_SCALE: 0.5,
+    REEL_MAX_BLUR: 6,
+    REEL_BLUR_FADE_DIST: 2,
+    REEL_BOUNCE_OFFSET: 15,
+    REEL_BOUNCE_SPEED: 0.4,
+    
+    FIRST_WIN_DELAY: 3,          
     CASCADE_WIN_DELAY: 1.5,        
     CASCADE_MULT_SPAWN_DELAY: 0.2, 
     NORMAL_WIN_DELAY: 3.0,         
@@ -160,13 +168,12 @@ export const CONFIG = {
     WIN_TEXT_POPUP_SPEED: 0.5,     
     PANEL_POPUP_SPEED: 0.8,        
     SYMBOL_ANIM_SPEED: 0.09,       
-    REEL_BOUNCE_SPEED: .5,        
     SYMBOL_DROP_SPEED: 0.3,
-    REEL_BOUNCE_OFFSET: 150,         
-    REEL_MAX_BLUR: 100,              
-    REEL_BLUR_FADE_DIST: 10,
-    WIN_HIGHLIGHT_DELAY: 10,       
+    WIN_HIGHLIGHT_DELAY: 1,       
     
+    // BETTING
+    BET_PRESETS: [100, 500, 1000, 5000],
+
     // PARTICLE EMITTER
     PARTICLE_ORIGIN_X: 0,         
     PARTICLE_ORIGIN_Y: 800,          
@@ -176,6 +183,7 @@ export const CONFIG = {
     BET_AMOUNT: 100,
     AUTO_SPIN_LIMIT: Number.POSITIVE_INFINITY,
     AUTO_SPIN_DELAY: 1500,       
+    FREE_SPIN_AUTO_DELAY: 800,   // ms pause between auto-fired free spins
 };
 
 

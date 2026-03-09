@@ -23,6 +23,10 @@ export class ModelUI {
         this.modelSprite.tint = isFreeSpins ? CONFIG.UI_COLORS.FREE_SPINS_TINT : CONFIG.UI_COLORS.DEFAULT_TINT;
     }
 
+    public updateResponsiveLayout(isPortrait: boolean) {
+        this.container.visible = !isPortrait; // Hide character in portrait
+    }
+
     getContainer(): Container { 
         return this.container;
     }

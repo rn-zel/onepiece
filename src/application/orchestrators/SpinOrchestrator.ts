@@ -35,6 +35,7 @@ export class SpinOrchestrator {
 
     /** Set by SlotMachine when the player taps spin during an ongoing spin. */
     isQuickSpin: boolean = false;
+    isTurbo: boolean = false;
 
     constructor(
         reels: Reel[],
@@ -124,7 +125,10 @@ export class SpinOrchestrator {
             r.blur.strengthX = 0;
             r.blur.strengthY = CONFIG.REEL_MAX_BLUR;
 
-            const duration = CONFIG.REEL_SPIN_DURATION + (i * 0.15);
+            const baseDuration = CONFIG.REEL_SPIN_DURATION;
+            const stagger = i * CONFIG.REEL_STAGGER_DELAY;
+            const timeScale = this.isTurbo ? CONFIG.TURBO_TIME_SCALE : 1;
+            const duration = (baseDuration + stagger) * timeScale;
 
             gsap.to(r, {
                 position: target,

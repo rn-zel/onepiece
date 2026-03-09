@@ -61,8 +61,10 @@ export type BackendPlayData = {
   balance: number;
   free_spin?: BackendFreeSpin | null;
   slot: BackendSlot;
-  jackpot_prizes?: Record<string, unknown> | null;
+  jackpot_prizes?: Record<string, number> | null;
   max_win_hit?: boolean;
+  jackpot_hit?: boolean;
+  jackpot_type?: "mini" | "major" | "grand";
 };
 
 export type BackendResponse<T> = { success: boolean; data: T };

@@ -1,79 +1,69 @@
-# Slot Machine — Mechanical & Gameplay Guide
+# ⚙️ Slot Machine Mechanic Documentation
 
-## Context & Purpose
-This document provides a deep dive into the **Gameplay Rules**, **Visual Timeline Animations (GSAP)**, and the **Cascade System** of the slot machine exactly as it works in the codebase.
-
-> **Looking for the Architectural Layout or Folder Structure?**
-> Please refer to `SYSTEM_OVERVIEW.md` (Domain-Driven Design boundaries) and `README.md` (Tech stack, NPM scripts). This file focuses strictly on *What happens on the reels* rather than *Where the files live*.
+> This document provides an architectural deep dive into the **Gameplay Mechanics**, **Visual Timelines (GSAP)**, and the **Cascade Engine** of the BountyRUSH Slot.
+> 
+> *For structural layout and Dependency Inversion guidelines, refer to `SYSTEM_OVERVIEW.md`.*
 
 ---
 
-## Technical Mechanics: How the Reels Operate
+## 🏗️ The Single Responsibility Principle (SRP) in Reels
 
-The slot machine simulates physical momentum using PixiJS and GSAP. This is handled by **`SpinOrchestrator.ts`** and **`Reel.ts`**. All mathematical results (`win`, `cascaded`, `free_spin`) are strictly dictated by the Node.js backend (`slotApi.ts` calling `http://localhost:3000`). There is no local evaluation math.
+The slot machine simulates tactile physics using PixiJS and deterministic GSAP tweens. This behavior is separated across `SpinOrchestrator.ts` (Application Layer) and `Reel.ts` (Domain Entity). This guarantees mathematical outcomes are perfectly disjoint from the presentation.
 
-### 1. Infinite Scrolling Simulation
-Each `Reel` instance hosts exactly 5 vertical sprite nodes, even though only 3 are visible beneath the red graphical mask. As the reel mathematically scrolls downward, the symbol at the bottom that falls out of bounds is teleported back to the top of the column and assigned a randomly generated texture. This allows an illusion of infinite physical scrolling.
+### 1. The 5x3 Masked Matrix
+Each `Reel` instance logically hosts 5 vertical sprite nodes, although only 3 are rendered beneath the visual mask. As the physical reel scrolls along the Y-axis, a symbol dropping below the mask teleport-resets to the top of the column and receives a randomly assigned payload texture. This creates a performant illusion of infinite downward velocity.
 
-### 2. Motion Blur & Physical Easing
-While spinning, PixiJS `BlurFilter` is applied dynamically based on the velocity `strengthY`.
-- The reels start fast (`power2.inOut`).
-- Once the backend resolves a payload, `SpinOrchestrator` calculates the exact distance needed to reach the `finalGrid` target coordinates.
-- The `strengthY` blur fades out linearly upon nearing the stopping point, snapping into a heavy, physical `back.out(1.5)` rubber-band bounce.
+### 2. Velocity-Driven Motion Blur
+While spinning, a dynamic PixiJS `BlurFilter` is applied to the reel container. 
+*   **Encapsulation:** The `strengthY` of the blur is calculated based strictly on current pixel velocity, handled entirely within the presentation boundary.
+*   **Resolution:** Once `SlotMachine` receives a resolved matrix from the Domain backend, `SpinOrchestrator` computes the exact distance required to align the `finalGrid` target coordinates. The motion blur fades linearly near the terminal coordinate, snapping into a heavy, physics-based `back.out(1.5)` rubber-band ease.
 
-### 3. Quick-Spin Aborting
-If a player taps the spin button again during an active rotation, `SlotMachine.ts` and `SpinOrchestrator` immediately flag `isQuickSpin = true` and `progress(1)`. This forces all tweens to skip their prolonged timelines and instantly slams the resolved payload onto the grid.
-
----
-
-## The Cascade Engine (Visual Sequence)
-
-When the backend returns a Win with nested `cascaded` steps, `CascadeOrchestrator.ts` visually presents the destruction sequence:
-
-1. **Highlighting**: Non-winning symbols are tinted dark grey (`0x555555`). Winning symbols glow back to full brightness.
-2. **Animation Loop**: `SymbolAnimator.ts` instantiates a dynamically scaled PixiJS `AnimatedSprite` (from the `symbols.png` spritesheet) exactly over the winning grid positions and loops the flash frame animation.
-3. **Multiplier & Win Chips**: A floating chip with the `stepPayout` (and optionally a glowing Multiplier chip if `multiplier > 1`) bounces out of the central destroyed symbol.
-4. **The Shatter**: GSAP tweens the winning base symbols and their overlay animations to quickly shrink and fade to `alpha: 0` while the global `ParticleEmitter` blasts a dust puff.
-5. **Gravity Drop**: All sprites physically located above the destroyed coordinates slide vertically downward.
-6. **Replenishment**: Over-the-mask coordinates (`newRow`) are populated by the target backend `CascadeStep.rng`. These new symbols drop into the viewable area, readying the board for the next recursion logic.
-7. **Live UI Ticking**: During every single step of this process, the `Sequence Win` is progressively pumped directly into the `UIManager` so the player sees their Balance / Total Win actively ticking upwards in real-time.
+### 3. Asymmetric Abort Flags (Quick-Spin)
+If a player taps the spin button during an active rotation, the `SlotMachine` instantly flags `isQuickSpin = true` and fires `timeline.progress(1)`. This O(1) operation skips all prolonged easing curves, immediately materializing the resolved backend payload onto the grid.
 
 ---
 
-## Game Rules & Triggers (Backend Enforced)
+## 💥 The Open/Closed Cascade Engine
 
-All evaluations are handled securely by the backend via a 243-Ways left-to-right matrix, but the frontend explicitly expects these formats:
+The Cascade engine dynamically handles nested win matrices (Avalanche drops) returned by the server. It is driven by the `CascadeOrchestrator.ts` and adheres strictly to the Open/Closed Principle—the orchestrator only commands abstract steps, never mutating the underlying math.
 
-### 1. Symbol Tiers
-- **Low-Tier Symbols**: `A, K, Q, J` 
-- **High-Tier Symbols**: `S1, S2, S3, S4`
-- **Wild (wild)**: Substitutes for any symbol evaluation except the Scatter.
-- **Scatter (sc)**: Can land randomly to trigger the feature, disregarding paylines.
-
-### 2. The Mega Bonus (Free Spins)
-- **Trigger**: 3 or more Scatters (`sc`) landing anywhere during an active base spin. (Can also be forced via `Buy Free Spins`).
-- **Award**: Instantly awards **10 Free Spins**.
-- **Visual Mechanics**: 
-   - A sequence forces all 3 Scatters to dramatically pop and scale larger while pulsing. 
-   - A gigantic `MEGA BONUS! 10 SPINS!` banner hits the screen.
-   - The UI Theme changes dynamically. The `UIManager` kills all non-essential buttons, and commands `WaterBg.ts`, `Starfield`, and `ModelUI` to switch to a red, high-octane `FREE_SPINS_TINT` palette.
-- **Economic Mechanics**: 
-   - Cash deductions cease. The `SlotMachine` tracks the `sessionWins` accumulatively. The `UIManager.totalWinText` stays aggressively bound to this running `sessionWins` ticker across every subsequent spin, never resetting.
-   - Once `bonusSpins` hits `0`, a final `TOTAL WIN` banner reveals the aggregate sum, the Blackhole VFX plays, and the daytime theme returns.
+1. **State Isolation:** The server payload dictates the precise grid of symbols to break and the new symbols to drop. The frontend *does not* calculate gravity collisions.
+2. **Visual Highlight:** Non-winning symbols are tinted (`0x555555`). Winning positions are restored to full brightness.
+3. **Event Emitting:** `SymbolAnimator.ts` instantiates a dynamically scaled `AnimatedSprite` loop directly over the mathematically verified coordinates.
+4. **The Shatter (GSAP):** Base symbols are collapsed via `.to({ scale: 0, alpha: 0 })`, concurrently triggering the global `ParticleEmitter` to blast a dust cache at the exact grid coordinates.
+5. **Gravitational Slide:** Surviving Sprites physically above the shattered coordinates are commanded to drop via deterministic timeline tweens.
+6. **Mask Replenishment:** Negative-Y coordinates above the visual mask are populated using the `CascadeStep.rng` array from the Server. 
+7. **Delegated UI:** The `Sequence Win` string is pumped via Dependency Injection directly into the `UIManager`, ticking the Balance and Total Win progressively in real-time.
 
 ---
 
-## Configuration Reference (`Config.ts`)
-The `Config.ts` file is the master director for tweaking the **feeling/volatility** of the Client side timings. 
+## 🔒 Feature Contracts (Backend Enforced logic)
 
-*Note: There are no math toggles (like Win Modes) here. Mathematics are permanently 100% backend.*
+**All probabilities, modes, and feature mechanics are calculated in a regulated, secure backend server.** The frontend Presentation Layer expects and visualizes these strict state transitions.
 
-| Variable | Target Layer | Description |
+### 1. Matrix Evaluations
+- **243 Ways-To-Win:** Evaluated left-to-right.
+- **Paylines:** Configurable per backend RNG ruleset. The frontend `SpinOrchestrator` merely reacts to the `winningPositions` array provided.
+- **Symbol Tiers:** Evaluates `Low` (A, K) against `High` (S1-S4).
+- **Substitutions:** `Wild` symbols bridge the combinations for every sprite except the Scatter. 
+
+### 2. The Free Spins State Machine
+- **State Transition:** 3 or more Scatters (`sc`) landing independently of paylines triggers the Free Spins mode.
+- **Visual Swap:** The `SlotMachine` Composition Root commands the `VFXManager` to draw a Black Hole transition. When the screen clears, all environmental `Starfield` and `WaterBg` modules tint crimson. The UI purges standard buttons via `UIManager`.
+- **Accumulator Context:** The mathematical bet deduction ceases. The `SlotMachine` begins tracking `sessionWins` accumulatively. The `UIManager.totalWinText` is hard-bound to this running total, explicitly bypassing the standard reset tick. 
+- **Destruction:** Once the `bonusSpins` count hits `0`, a final `TOTAL WIN` execution reveals the aggregate mathematical sum. The state machine unwinds to Base Game aesthetics.
+
+---
+
+## ⚙️ Configuration File Parameters (`Config.ts`)
+
+The `Config.ts` file acts as the ultimate authority for tweaking the **visceral feeling** and **timing** of the Presentation boundary. 
+
+| Variable | Architectural Impact | Description |
 | :--- | :--- | :--- |
-| `REEL_SPIN_DURATION` | Presentation | Base seconds for the mechanical spin graphic before snapping. *(E.g., 2.5s)* |
-| `SYMBOL_DROP_SPEED` | Presentation | Speed of gravity during a cascade replenishment drop. *(E.g., 0.3s)* |
-| `NORMAL_WIN_DELAY` | Sequence | Time allocated to hold on a single non-cascading win before yielding the spin button back. |
-| `SYMBOL_ANIM_SPEED` | Presentation | PixiJS playback internal rate (`0.0 - 1.0`) of the `symbols.png` win spritesheet. |
-| `PANEL_POPUP_SPEED` | Presentation | Duration (seconds) it takes big `WinPresenter` overlays to elastic-bounce in. |
-| `API_BASE_URL` | Infrastructure | Defaults to `http://localhost:3000`. Set to production URL when deploying. |
-| `UI_COLORS` | Presentation | Tints used during normal play vs Free Spins mode. |
+| `REEL_SPIN_DURATION` | Sequence Control | Base seconds for the physical spin graphic before backend yield. *(E.g., 2.5s)* |
+| `SYMBOL_DROP_SPEED` | Easing Parameter | Seconds consumed by gravity during a cascade replenishment timeline. |
+| `NORMAL_WIN_DELAY` | Thread Hold | Time to pause the main thread on a win before yielding the state machine back to `Idle`. |
+| `PANEL_POPUP_SPEED` | Easing Parameter | Speed at which massive `WinPresenter` SVG overlays elastic-bounce into frame. |
+| `API_BASE_URL` | Infrastructure Coupling | Pointer to the active RNG Microservice. *(Default: `http://localhost:3000`)* |
+| `UI_COLORS` | CSS/Tint Variables | Hardcoded hexadecimal palettes dictating State Machine shifts (e.g., Free Spins red). |

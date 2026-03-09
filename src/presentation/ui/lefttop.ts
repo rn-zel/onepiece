@@ -20,6 +20,10 @@ export class LeftTopUI {
     }
 
 
+    public updateResponsiveLayout(isPortrait: boolean) {
+        this.container.visible = !isPortrait; // Hide hat in portrait
+    }
+
     getContainer(): Container {
         return this.container;
     }

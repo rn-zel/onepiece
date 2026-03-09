@@ -205,4 +205,37 @@ export class ParticleEmitter {
         // Store it so we can kill it later when the spin ends
         return aura;
     }
+    // Infinite coin shower from the top
+    public shower(duration: number = 5) {
+        const startTime = Date.now();
+        const spawnInterval = setInterval(() => {
+            if (Date.now() - startTime > duration * 1000) {
+                clearInterval(spawnInterval);
+                return;
+            }
+
+            const x = Math.random() * 1920;
+            const y = -100;
+            const coin = new Sprite(this.coinTexture);
+            coin.anchor.set(0.5);
+            coin.scale.set(Math.random() * 0.5 + 0.8);
+            coin.x = x;
+            coin.y = y;
+            this.container.addChild(coin);
+
+            const fallDuration = 2.5;
+
+            gsap.to(coin, {
+                y: 1200,
+                x: x + (Math.random() * 200 - 100),
+                rotation: Math.random() * 10,
+                duration: fallDuration,
+                ease: "none",
+                onComplete: () => {
+                    if (coin.parent) coin.parent.removeChild(coin);
+                    coin.destroy();
+                }
+            });
+        }, 50);
+    }
 }

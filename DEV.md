@@ -1,171 +1,87 @@
-##  Documentation
+# 💻 Developer Contribution Guide
 
-This document explains how to work with the codebase as a developer: how to navigate the structure, extend features, and respect the DDD/SOLID boundaries that have been set up.
+> This document establishes the **Domain-Driven Design (DDD)** and **SOLID** engineering standards required for contributing to the BountyRUSH Slot Engine. All pull requests will be evaluated against these principles.
 
----
-
-## Project Structure (High Level)
-
-- **Root**
-  - `SLOT_MACHINE.md`: Game rules and core slot design.
-  - `SLOT_BACKEND.md`: Backend integration design and API contract.
-  - `SYSTEM_OVERVIEW.md`: System architecture and data flow.
-  - `IMPROVEMENTS`: Roadmap and ideas for future enhancements.
-  - `slot-free.js`: Sample Express backend with canned test data.
-
-- **`src/`**
-  - **Application / UI**
-    - `main.ts`: Boots Pixi and creates `SlotMachine`.
-    - `SlotMachine.ts`: Main game controller and orchestrator.
-    - `UIManager.ts`: HUD and controls.
-    - `VFXManager.ts`: Transitions and special effects.
-    - `Reel.ts`: Logical reel representation.
-    - `services/SymbolAnimator.ts`: Symbol animation service.
-    - `ui/lefttop.ts`, `ui/title.ts`: Hat and title UI components.
-  - **Domain**
-    - `domain/wins/**`: Win math, paytables, cascades.
-    - `domain/spin/**`: Spin engine interface and local implementation.
-  - **Infrastructure**
-    - `api/slotApi.ts`: HTTP client for `slot-free.js`.
-  - **Configuration**
-    - `Config.ts`: Layout, payouts, assets, mode toggles.
+This repository enforces strict architectural boundaries to decouple the PixiJS Presentation layer from the Mathematical Game State and Backend Infrastructure. If you are adding a new feature, modifying payouts, or injecting new visual effects, you must understand where your code belongs.
 
 ---
 
-## DDD and SOLID Boundaries
+## 🏛️ Project Structure Primer
 
-### Domain layer
+Before writing any logic, identify your Bounded Context:
 
-- Pure TypeScript with **no Pixi or browser dependencies**.
-- Key domain abstractions:
-  - `Grid`, `Win`, `WinEvaluationResult`, `GridPosition`.
-  - `Paytable` – symbol payout rules.
-  - `WinEvaluator` – how wins are detected and aggregated (paylines vs 243 ways).
-  - `CascadeEngine` – cascade loop (evaluate → remove → drop/fill → repeat).
-  - `SpinEngine` / `SpinResult` – high-level “one spin” abstraction.
-- You can unit test these types in isolation by passing simple arrays and fake paytables.
+- **1. Domain (`src/domain/`)**
+  - **What it is:** Pure Types, Primitive Rules, Entities, and Global Config.
+  - **Rule:** *No PixiJS, Howler, DOM, or Network logic is allowed here.* 
+  - **Examples:** `GridPosition`, `GameContext`, `Reel`, `Config`.
 
-### Application / presentation layer
+- **2. Application (`src/application/`)**
+  - **What it is:** The Orchestrators and the Root Composition Hub (`SlotMachine`).
+  - **Rule:** *It manages the workflow (the "When") by commanding interfaces, but implements neither the visual "How" nor the math "What".*
+  - **Examples:** `SpinOrchestrator`, `CascadeOrchestrator`.
 
-- `SlotMachine` and related Pixi/GSAP code:
-  - Responsible only for:
-    - **Input**: button presses, auto‑spin.
-    - **Output**: animations, text fields, sounds.
-  - Talks to:
-    - Domain via `WinEvaluator` and `LocalSpinEngine`.
-    - Backend via `slotApi` (in backend mode).
+- **3. Presentation (`src/presentation/`)**
+  - **What it is:** The PixiJS Stage, Visual Timelines, Particle Effects, and UI.
+  - **Rule:** *It cannot dictate game outcomes, parse JSON, or track logic-critical state. It only reacts to public method invocations from the Application layer.*
+  - **Examples:** `WinPresenter`, `SymbolAnimator`, `VFXManager`.
 
-### Configuration / infrastructure
-
-- `Config.ts`:
-  - `PAYOUTS`, `SYMBOL_BASE`, `WIN_MODE`, `ENABLE_CASCADING`, `USE_BACKEND`, `API_BASE_URL`.
-  - Layout constants and UI positions.
-- `slotApi.ts`:
-  - Knows HTTP details and backend JSON shapes.
-- `slot-free.js`:
-  - An **example** backend; real production backends can implement the same contract.
+- **4. Infrastructure (`src/infrastructure/`)**
+  - **What it is:** Browsers Adapters, APIs, Audio Contexts.
+  - **Rule:** *It translates the outside world into Domain models (Anticorruption Layer) and vice-versa.*
+  - **Examples:** `slotApi.ts`, `SoundManager.ts`.
 
 ---
 
-## Common Tasks
+## 🏗️ SOLID Feature Implementation Guide
 
-### Change payouts or symbol values
+### 1. Extending The System (Open/Closed Principle)
+Do not modify existing, stable orchestrators or entities when adding new functionality. Extend via new Services or Implementations.
 
-1. Open `Config.ts`.
-2. Adjust:
-   - `SYMBOL_BASE`: per‑symbol base multiplier for 3‑of‑a‑kind.
-   - `PAYOUTS.MULTI_4` / `PAYOUTS.MULTI_5`: multipliers for 4 and 5 of a kind.
-   - `PAYOUTS.JACKPOT`: jackpot multiplier for 5 wilds on a payline.
-3. Because `ConfigPaytable` reads from these values and both `PaylineWinEvaluator` and `Ways243WinEvaluator` use the paytable, the updated payouts automatically apply to **both** modes.
+**Example: Adding a new Particle System (Presentation Layer)**
+If you want to add a new "Coin Shower" effect:
+1. Create `src/presentation/vfx/CoinShower.ts`.
+2. Do not call this directly from the backend payload.
+3. Expose a public `burst(amount: number)` method.
+4. Pass `CoinShower` explicitly into `SlotMachine` via Dependency Injection in its boot environment, then let the `CascadeOrchestrator` invoke `scene.coinShower.burst()`.
 
-### Add a new symbol
+### 2. Modifying Win Mechanics (Single Responsibility Principle)
+If you need to switch from Paylines to Cluster Pays, do not embed math into `SlotMachine.ts`.
+1. The backend `slot-free.js` generates the win.
+2. The infrastructure `slotApi.ts` receives JSON and casts it to matching `GameTypes` (DTOs).
+3. The Presentation layer (`SymbolAnimator.ts`) highlights the DTO's `GridPosition` array without caring *why* they won.
 
-1. Add the texture file to your assets and update:
-   - `ASSETS.TEXTURES` in `Config.ts`.
-2. Decide where the new symbol fits:
-   - Low (like A,K,Q,J) or high (like S1–S4).
-3. Update:
-   - `SYMBOL_BASE` to include a base value for the new index.
-   - Any UI or art that depends on the symbol count (if necessary).
-4. Adjust win evaluators if the symbol should be treated specially (e.g. a new wild or scatter type).
-
-### Switch between paylines and 243 ways
-
-1. Open `Config.ts`.
-2. Set:
-   - `WIN_MODE: "PAYLINES"` or `"WAYS_243"`.
-3. `SlotMachine` will:
-   - Use `this.paylineEvaluator` or `this.waysEvaluator` accordingly.
-   - The cascade engine and `LocalSpinEngine` adjust automatically based on `mode`.
-
-### Enable or disable cascading
-
-1. Open `Config.ts`.
-2. Set:
-   - `ENABLE_CASCADING: true` or `false`.
-3. Behavior:
-   - `false`: `reelsComplete` uses a **single** `WinEvaluator.evaluate` call and updates wins with no domain cascades.
-   - `true`: `reelsComplete` calls `LocalSpinEngine.spin`, which uses `CascadeEngine` to compute cascades and total win.
-
-### Use backend vs local math
-
-1. Open `Config.ts`.
-2. Set:
-   - `USE_BACKEND: false` – all math is local.
-   - `USE_BACKEND: true` – game requests outcomes from the backend.
-3. Ensure `API_BASE_URL` points to the running backend (e.g. `http://localhost:3000`).
-4. For more details, refer to `SLOT_BACKEND.md`.
+### 3. Adding a New Symbol (Separation of Concerns)
+1. Drop the base image into `src/assets/`.
+2. Register the preload identifier in `Config.ASSETS.TEXTURES`.
+3. If the symbol introduces new mathematical logic (like a Multiplier Wild), the **backend** dictates the behavior. The frontend only needs the `id` matched to the texture map to render it.
 
 ---
 
-## Extending the System
+## 🔄 Managing Application Flow
 
-### Add a new win mode
+All relevant UI timings, GSAP ease speeds, and interaction halts live primarily within `SlotMachine.ts` and its Orchestrators.
 
-1. Create a new evaluator implementing `WinEvaluator` in `src/domain/wins`:
-   - Example: `ClusterWinEvaluator` for cluster pays.
-2. Inject your new evaluator into `SlotMachine` alongside the existing ones.
-3. Extend:
-   - `WinMode` union in `domain/wins/types.ts` to include your mode.
-   - `SpinRequest.mode` to handle the new value.
-4. Update `Config.ts`:
-   - Add your new `WIN_MODE` option.
-5. Switch on the new mode where evaluators are selected (e.g. in `LocalSpinEngine` and `reelsComplete`).
-
-### Adjust animation timing
-
-All relevant timings are in `SlotMachine.ts` and VFX modules:
-
-- Symbol bounce, highlight, and break durations.
-- Cascade step delays and win‑text pop delays.
-- Auto‑spin delay (`PAYOUTS.AUTO_SPIN_DELAY`).
-
-Pattern:
-
-- Look for `gsap.to`, `gsap.delayedCall`, and `duration` arguments.
-- For more consistent tuning, consider extracting critical durations into a small config object (e.g. `ANIMATION_CONFIG`) in `Config.ts` and referencing them from the animation code.
-
-### Integrate a production backend
-
-1. Implement a backend that matches the **API contract** described in `SLOT_BACKEND.md`:
-   - Endpoints: `/load`, `/play`, `/play-free-game`, `/buy-free-game`, `/jackpot`.
-   - Response JSON shape compatible with `BackendPlayData` and friends in `slotApi.ts`.
-2. Adjust:
-   - `API_BASE_URL` to point at your deployed backend.
-3. Optionally:
-   - Replace `slot-free.js` with your own service in CI/dev environments.
+Instead of hardcoding `gsap.to(..., { duration: 1.5 })`:
+1. Extract magic values into `src/domain/constants/Config.ts`.
+2. Reference `CONFIG.SYMBOL_DROP_SPEED` or `CONFIG.PANEL_POPUP_SPEED`.
+3. This ensures balancing the visceral feeling of the presentation layer can be managed by a mathematical designer via a single file.
 
 ---
 
-## Coding Guidelines
+## 🌐 Connecting a Production Backend
 
-- Keep **domain logic** (rules, payouts, grid transformations) in `src/domain/**`.
-  - Avoid importing Pixi or browser APIs there.
-- Keep **infrastructure concerns** (HTTP, Express, file I/O) in dedicated modules:
-  - `slotApi.ts`, `slot-free.js`, or future adapters.
-- In presentation layer:
-  - Use domain types when possible (`Grid`, `Win`, `SpinResult`) instead of raw arrays or JSON from the backend.
-  - Let domain decide **what** happened; let UI decide **how it looks**.
+To substitute the local `slot-free.js` mathematics simulator for a production RNG Microservice:
 
-By adhering to these patterns, you preserve a clean, testable, and enterprise‑friendly architecture while still being able to iterate quickly on visuals and UX.
+1. Guarantee your production server honors the rigorous JSON contract defined in the `BackendPlayData` and `BackendCascadeStep` Types in `slotApi.ts`.
+2. Point `API_BASE_URL` in `Config.ts` to your active server IP/Domain.
+3. The frontend is agnostic. As long as the Integration Contract is met, it will render flawless 60fps cascading spin sequences dynamically.
 
+---
+
+## 🛡️ Coding Discipline
+
+- Use concrete interfaces defined in `src/domain/models/GameTypes.ts`. **Do not use `any`.**
+- If a class is drawing a button and calculating a percentage, split it into two files (A presentation UI and a Domain Service).
+- Let the Domain decide **What** happened; let UI decide **How it looks**.
+
+By adhering strictly to these patterns, the BountyRUSH Slot Engine minimizes tech debt and remains impervious to cascading side-effects during architectural scaling.

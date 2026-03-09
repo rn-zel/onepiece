@@ -1,145 +1,96 @@
-# 🎰 BountyRUSH Slot Engine
+# 🎰 BountyRUSH WebGL Slot Engine
 
-> A high-performance, Domain-Driven Design (DDD) slot machine engine built with Pixi.js, GSAP, and strict TypeScript.
+> **A High-Performance, Domain-Driven Design (DDD) Slot Machine Engine.**
+> Built with PixiJS v7, GSAP, and strict TypeScript. Engineered for 60fps performance and long-term extensibility via SOLID principles.
 
-Welcome to the **BountyRUSH** project. This repository contains the complete frontend engineering for a production-ready WebGL slot machine. It enforces strict architectural boundaries, 60fps performance standards, and explicit type safety.
+Welcome to the **BountyRUSH** project. This repository contains the complete frontend engineering for a production-ready WebGL slot machine. 
+
+As the Principal Architect of this system, the core mandate was to establish a codebase that survives changing business requirements. We achieve this by enforcing strict architectural boundaries, decoupling the visual presentation from the mathematical game state, and relying heavily on Dependency Inversion.
 
 ---
 
-## ✨ Features
+## ✨ System Capabilities
 
-- **Physics-Based Reels:** Smooth acceleration, blurring, and physics-driven bounce-backs powered by GSAP.
-- **Dynamic Cascade System:** Multi-stage breaking symbols, falling replacements, and chained wins.
-- **Enterprise Architecture:** Strict separation of UI (Pixi.js) from core Game Logic via Domain-Driven Design.
-- **Performance Optimized:** Advanced WebGL batching, asset spritesheeting, and isolated VFX contexts.
-- **Responsive Sizing:** Auto-scaling camera constraints to maintain the exact aspect ratio on mobile, tablet, and desktop.
+- **Physics-Based Reels:** True momentum, blur filters, and GSAP-driven physical bounce-backs.
+- **Avalanche Drop Engine:** A decoupled cascade system supporting multi-stage symbol breaking and chained win evaluations.
+- **Strict Separation of Concerns:** Core domain math and orchestrators have zero knowledge of PixiJS or the HTML DOM.
+- **Enterprise Type Safety:** Complete elimination of `any` types. Data flow from backend JSON to WebGL Sprite is strictly guarded by TypeScript compilation.
+- **O(1) Asset Resolution:** Spritesheet atlasing and pre-loading guarantees zero mid-spin HTTP requests for visual assets.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Category | Technology | Purpose |
+| Architecture Layer | Technology | Engineering Purpose |
 | :--- | :--- | :--- |
-| **Engine** | [Pixi.js v7/v8](https://pixijs.com/) | 2D WebGL rendering pipeline |
-| **Animation** | [GSAP](https://greensock.com/gsap/) | Deterministic easing and timeline orchestration |
-| **Language** | [TypeScript](https://www.typescriptlang.org/) | Strict typing (`erasableSyntaxOnly`, no `any`) |
-| **Tooling** | [Vite](https://vitejs.dev/) | Sub-second HMR development server |
+| **Presentation / WebGL** | [PixiJS v8](https://pixijs.com/) | Hardware-accelerated 2D rendering pipeline |
+| **Animation / Sequencing** | [GSAP](https://greensock.com/gsap/) | Deterministic easing and timeline orchestration |
+| **Domain / Contracts** | [TypeScript](https://www.typescriptlang.org/) | Strict typing (`erasableSyntaxOnly`) bridging I/O boundaries |
+| **Build / Tooling** | [Vite](https://vitejs.dev/) | HMR development server and ES module bundling |
 
 ---
 
-## 📦 Installation & Setup
+## 🏗️ Architectural Vision (Domain-Driven Design)
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v18+ recommended)
-- `npm` or `pnpm`
-
-### Getting Started
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-org/bounty-rush-slot.git
-   cd bounty-rush-slot
-   ```
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-3. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
-4. **Run strict type-checking:** (Recommended before committing)
-   ```bash
-   npx tsc --noEmit
-   ```
-
----
-
-## 🏗️ System Architecture (Domain-Driven Design)
-
-The `src/` directory is strictly divided into four distinct layers. **Dependencies must always point inward** toward the Domain. The Domain knows nothing about the Pixi.js renderer.
+The `src/` directory is strictly divided into four functional layers. **The Golden Rule:** Dependencies must *always* point inward toward the Domain. 
 
 ```text
 /src
-├── /domain              ← [Core] Business Rules (NO Pixi.js imports allowed)
-│   ├── /models          Interfaces (GameTypes.ts: SymbolSprite, CascadeStep)
-│   ├── /entities        Game Objects (Reel.ts)
-│   └── /constants       Globals (Config.ts)
+├── /domain              ← [Core] Business Rules & Mathematical Models
+│   ├── /models          Type Interfaces (e.g., `GridPosition`, `CascadeStep`)
+│   ├── /entities        Stateful Game Objects (e.g., `Reel`)
+│   └── /constants       Global Constants (e.g., `Config`)
 │
-├── /application         ← [Flow] Use Cases & Logic
-│   ├── /orchestrators   Game Flow (SpinOrchestrator.ts, CascadeOrchestrator.ts)
-│   └── SlotMachine.ts   The Composition Root (Wires layers together)
+├── /application         ← [Flow] Orchestration & Use Cases
+│   ├── /orchestrators   Sequence Drivers (e.g., `SpinOrchestrator`, `CascadeOrchestrator`)
+│   └── SlotMachine.ts   The Composition Root (Dependency Injection hub)
 │
-├── /infrastructure      ← [External] I/O Boundaries
-│   ├── /api             Backend communications (slotApi.ts)
-│   └── /audio           Howler/WebAudio adapters (SoundManager.ts)
+├── /infrastructure      ← [I/O] External System Drivers
+│   ├── /api             Backend HTTP Adapters (`slotApi.ts`)
+│   └── /audio           WebAudio Wrappers (`SoundManager.ts`)
 │
-└── /presentation        ← [UI] Pixi.js Rendering & VFX
-    ├── /ui              Menus, Buttons, Win Panels (UIManager, WinPresenter)
-    ├── /vfx             Particles, Screen Shake (VFXManager, ParticleEmitter)
-    └── /animation       Tweens, Shaders (Starfield, LightningBorder)
+└── /presentation        ← [UI] PixiJS Rendering & Post-Processing
+    ├── /ui              Menus, HUD, Text Modals (`UIManager`, `HelpModal`)
+    ├── /vfx             Particles, Layout Shaders (`VFXManager`)
+    └── /animation       Stateful visual actors (`SymbolAnimator`)
 ```
 
-### Architectural Rules for Contributors:
-1. **No Mixed Layers:** Do not put HTTP requests inside `presentation/ui`. Do not put Pixi.js `Graphics` inside `domain/models`.
-2. **Single Responsibility:** If a file is doing two different things (e.g., drawing a button and calculating odds), split it into two files.
-3. **No `any` Types:** Use concrete interfaces defined in `src/domain/models/GameTypes.ts`.
+### The SOLID Contract for Contributors:
+1. **Single Responsibility Principle (SRP):** If a class handles DOM clicks, it *cannot* calculate winning paylines.
+2. **Open/Closed Principle (OCP):** New win mechanics (like Cluster Pays) should be implemented by creating a new `WinEvaluator`, not by modifying existing ones `if (mode === 'cluster')`.
+3. **Dependency Inversion (DIP):** Presentation layers rely on abstractions. The `SlotMachine` composition root injects concrete instances (like `ParticleEmitter`) into orchestrators via their constructors.
 
 ---
 
-## 🎮 Core Engine Modules
+## 🚀 Quick Start Guide
 
-Understanding these three orchestrators is critical to working on this codebase:
+### Prerequisites
+- [Node.js](https://nodejs.org/) (v18+ LTS recommended)
+- `npm`
 
-### 1. The Composition Root (`SlotMachine.ts`)
-This class acts as the "Bootstrapper". It initializes the Pixi application, fetches the starting balance from `slotApi.ts`, builds the UI, and passes references down to the orchestrators. 
+### Bootstrapping the Environment
+1. **Clone & Install:**
+   ```bash
+   git clone https://github.com/your-org/bounty-rush-slot.git
+   cd bounty-rush-slot
+   npm install
+   ```
+2. **Launch the Development Server:**
+   ```bash
+   npm run dev
+   ```
+3. **Run the Math Simulator (Optional):**
+   *(If `USE_BACKEND = true` in `Config.ts`)*
+   ```bash
+   node slot-free.js
+   ```
 
-### 2. The Reel Engine (`SpinOrchestrator.ts`)
-Manages the physics of a physical spin:
-- Calculates blurring magnitude based on velocity `(remaining / CONFIG.REEL_BLUR_FADE_DIST) * CONFIG.REEL_MAX_BLUR`
-- Assigns the final backend grid into the visual symbols.
-- Handles Special Symbol (Wild/Scatter) bounce impact animations.
-
-### 3. The Cascade Engine (`CascadeOrchestrator.ts`)
-Because this is an avalanche-style slot, the cascade engine is an async pipeline:
-1. Receives an array of `CascadePlayStep` from the backend.
-2. `[Highlight]`: Tints losing symbols grey and emits glow onto winning lines.
-3. `[Break]`: Shrinks and fades winning symbols into dust particles.
-4. `[Slide]`: GSAP tweens the surviving symbols down to fill the empty rows.
-5. `[Drop]`: Spawns new symbols from above the mask `-y` boundary.
-6. Awaits all `Tween` promises before moving to the next cascade step.
-
----
-
-## 🖌️ Adding New UI Elements or VFX
-
-If you are a frontend or technical artist joining the project to add new visuals:
-
-1. Create your class in `src/presentation/vfx/` or `src/presentation/animation/`.
-2. Let the class accept a `PIXI.Container` in its constructor to attach itself to.
-3. **Do not** write core game logic in your visual class.
-4. Expose simple trigger methods like `play()`, `stop()`, or `showBonusSplash()`.
-5. Wire your new visual class up in `SlotMachine.ts` by injecting it.
-
-### Example Visual Injection:
-```typescript
-// Good:
-const lightning = new LightningBorder(sceneContainer);
-const vfx = new VFXManager(lightning);
-
-// Bad (Hard coupling):
-const vfx = new VFXManager(); // VFX creates LightningBorder itself
+### Pre-Commit Checks
+We rely on the TS compiler for CI/CD integrity. Before opening a Pull Request, ensure the codebase satisfies strict typing:
+```bash
+npx tsc --noEmit
 ```
 
 ---
 
-## 🎨 Asset Management
-All raw assets should be placed in `src/assets/`. 
-- Image assets (PNG, JPG)
-- Audio clips (MP3, WAV)
-- Spritesheet Atlases (JSON, PNG pairs)
-
-When a new asset is added, use `import myImage from "./assets/myImage.png"` to allow Vite to hash the asset correctly for cache-busting in the production build.
-
----
-
-💼 *Developed with SOLID Engineering Principles.*
+*Engineered with strict discipline. Built for scale.*

@@ -11,6 +11,8 @@ import type { CascadePlayStep, GridPosition, SymbolSprite } from "../../domain/m
 import type { SymbolAnimation } from "../../presentation/animation/SymbolAnimation";
 
 
+import type { SoundManager } from "../../infrastructure/audio/SoundManager";
+
 function tweenToEnd(tween: gsap.core.Tween | gsap.core.Timeline): Promise<void> {
     return new Promise<void>((resolve) => {
         tween.eventCallback("onComplete", () => resolve());
@@ -29,6 +31,7 @@ export class CascadeOrchestrator {
     private uiManager: UIManager;
     private winPresenter: WinPresenter;
     private symbolAnimator: SymbolAnimation;
+    private soundManager: SoundManager;
     private activeAnimations: AnimatedSprite[];
 
     constructor(
@@ -37,6 +40,7 @@ export class CascadeOrchestrator {
         uiManager: UIManager,
         winPresenter: WinPresenter,
         symbolAnimator: SymbolAnimation,
+        soundManager: SoundManager,
         activeAnimations: AnimatedSprite[]
     ) {
         this.reels = reels;
@@ -44,6 +48,7 @@ export class CascadeOrchestrator {
         this.uiManager = uiManager;
         this.winPresenter = winPresenter;
         this.symbolAnimator = symbolAnimator;
+        this.soundManager = soundManager;
         this.activeAnimations = activeAnimations;
     }
 
@@ -67,20 +72,40 @@ export class CascadeOrchestrator {
 
         const steps = this._buildSteps(cascaded, initialWin);
         let accumulatedWin = 0;
+        let stepIndex = 0;
 
         for (const step of steps) {
             const winningPositions: GridPosition[] = step.cascades.map((c) => ({
                 reel: c.column,
                 row: c.row,
             }));
-            if (winningPositions.length === 0) continue;
+            if (winningPositions.length === 0) {
+                stepIndex++;
+                continue;
+            }
 
             const stepPayout = step.win * (step.multiplier ?? 1);
+            if (stepPayout > 0) this.soundManager.playSFX("sfx_coin");
             accumulatedWin += stepPayout;
             onStep(accumulatedWin);
 
+            if (stepIndex > 0) {
+                // Ensure all symbols are visually neutral (white tint, base scale) while waiting.
+                this.reels.forEach((r) =>
+                    r.symbols.forEach((s) => {
+                        s.tint = 0xFFFFFF;
+                        s.zIndex = 0;
+                        s.scale.set((s as unknown as SymbolSprite).baseScale || 1);
+                    })
+                );
+                
+                // Wait so the player can see the symbols that just fell.
+                await tweenToEnd(gsap.to({}, { duration: CONFIG.WIN_HIGHLIGHT_DELAY }));
+            }
+
             // ── Highlight winners ──
             this.winPresenter.hide();
+            // Now darken the non-winning symbols to make the winners pop
             this.reels.forEach((r) => r.symbols.forEach((s) => (s.tint = 0x555555)));
 
             for (const p of winningPositions) {
@@ -115,7 +140,8 @@ export class CascadeOrchestrator {
                 this.particleEmitter.burst(CONFIG.PARTICLE_ORIGIN_X, CONFIG.PARTICLE_ORIGIN_Y, isBigWin ? 100 : 30);
             });
 
-            await tweenToEnd(gsap.to({}, { duration: 2.0 }));
+            const currentDelay = stepIndex === 0 ? CONFIG.FIRST_WIN_DELAY : CONFIG.CASCADE_WIN_DELAY;
+            await tweenToEnd(gsap.to({}, { duration: currentDelay }));
 
             // ── Break winning symbols ──
             const breakTweens: gsap.core.Tween[] = [];
@@ -163,6 +189,8 @@ export class CascadeOrchestrator {
                     s.scale.set((s as unknown as SymbolSprite).baseScale || 1);
                 })
             );
+
+            stepIndex++;
         }
 
         // Restore full brightness when done
@@ -246,6 +274,7 @@ export class CascadeOrchestrator {
             const keptCount = keptOldRows.length;
 
             // Slide kept symbols down to their new positions
+            if (keptCount < 3) this.soundManager.playSFX("sfx_break");
             for (let k = 0; k < keptCount; k++) {
                 const oldRow = keptOldRows[k];
                 const newRow = 3 - keptCount + k;

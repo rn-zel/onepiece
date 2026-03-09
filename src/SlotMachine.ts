@@ -19,6 +19,9 @@ import { SpinOrchestrator } from "./application/orchestrators/SpinOrchestrator";
 import { CascadeOrchestrator } from "./application/orchestrators/CascadeOrchestrator";
 import type { SymbolAnimation } from "./presentation/animation/SymbolAnimation";
 import type { SymbolSprite } from "./domain/models/GameTypes";
+import { JackpotPresenter } from "./presentation/ui/JackpotPresenter";
+import { BuyFreeSpinsModal } from "./presentation/ui/BuyFreeSpinsModal";
+import { TelemetryService } from "./domain/services/TelemetryService";
 
 export class SlotMachine {
     app: Application;
@@ -34,6 +37,8 @@ export class SlotMachine {
     vfxManager!: VFXManager;
     soundManager: SoundManager = new SoundManager();
     particleEmitter!: ParticleEmitter;
+    jackpotPresenter!: JackpotPresenter;
+    private buyFreeSpinsModal!: BuyFreeSpinsModal;
 
     reels: Reel[] = [];
     activeAnimations: AnimatedSprite[] = [];
@@ -44,7 +49,14 @@ export class SlotMachine {
     balance: number = CONFIG.CURRENT_BALANCE;
     betAmount: number = CONFIG.BET_AMOUNT;
     bonusSpins: number = 0;
-    sessionWins: number = 0;
+    private sessionWins: number = 0;
+    private telemetry = TelemetryService.getInstance();
+
+    autoSpinConfig = {
+        stopOnWin: true,
+        stopOnLossLimit: 5000,
+        sessionLoss: 0
+    };
     lastSpinWin: number = 0;
 
     running: boolean = false;
@@ -52,6 +64,8 @@ export class SlotMachine {
     autoSpinActive: boolean = false;
     autoSpinCount: number = 0;
     isEditingBet: boolean = false;
+    freeSpinAutoActive: boolean = false;
+    freeSpinDelayTween: gsap.core.Tween | null = null;
 
     lightning: LightningBorder = new LightningBorder();
     starfield: Starfield;
@@ -101,19 +115,34 @@ export class SlotMachine {
         );
         this.uiManager = new UIManager(
             () => this.startSpin(),
-            () => this.startAutoSpin(),
             () => this.openBuyFreeSpinsModal(),
-            (amount) => this.adjustBet(amount),
+            (amount: number) => this.adjustBet(amount),
             () => this.enableBetEditing(),
+            (config: any) => this.startManualAutoSpin(config)
         );
 
         const particleContainer = new Container();
         particleContainer.zIndex = 15;
         this.mainContainer.addChild(particleContainer);
         this.particleEmitter = new ParticleEmitter(this.app, particleContainer);
+        this.jackpotPresenter = new JackpotPresenter(this.app.stage, this.particleEmitter);
+        this.buyFreeSpinsModal = new BuyFreeSpinsModal(this.app.stage); // Initialized the new modal
 
         this.uiManager.container.zIndex = 100;
         this.mainContainer.addChild(this.uiManager.container);
+
+        this.uiManager.container.on('betPreset', (amount: number) => {
+            if (!this.running && this.bonusSpins <= 0) {
+                this.betAmount = amount;
+                this.uiManager.updateBetTextDisplay(this.betAmount.toString());
+                this.soundManager.playSFX('sfx_bet');
+            }
+        });
+
+        this.uiManager.container.on('turboToggle', (isActive: boolean) => {
+            this.spinOrchestrator.isTurbo = isActive;
+            this.soundManager.playSFX('sfx_button');
+        });
 
         // Win presenter must be created before spin/cascade orchestrators
         this.winPresenter = new WinPresenter(this.uiManager);
@@ -159,6 +188,7 @@ export class SlotMachine {
             this.uiManager,
             this.winPresenter,
             this.symbolAnimator,
+            this.soundManager,
             this.activeAnimations
         );
 
@@ -236,11 +266,30 @@ export class SlotMachine {
             this.spinOrchestrator.animateReels(grid, isBonusMode, async () => {
                 this.reels.forEach((r) => { r.isFreeSpins = this.bonusSpins > 0; });
 
+                if (data.jackpot_hit && data.jackpot_type) {
+                    this.running = true;
+                    this.uiManager.spinButton.interactive = false;
+                    this.uiManager.spinButton.alpha = 0.5;
+                    
+                    const winAmount = data.jackpot_prizes?.[data.jackpot_type] || 0;
+                    this.soundManager.playSFX("sfx_maxwin");
+                    await this.jackpotPresenter.show(data.jackpot_type, winAmount);
+                }
+
+                // Always refresh balance display as soon as reels settle (deduction visible even on no-win)
+                const currentDisplay = this.vfxManager.isFreeSpinsTheme ? this.sessionWins : this.lastSpinWin;
+                this.uiManager.updateTextValues(this.balance, currentDisplay, this.bonusSpins);
+
                 const hasCascade = data.slot.cascaded && data.slot.cascaded.length > 0;
                 const isEnteringFreeSpins =
                     !!data.free_spin && (data.free_spin.count ?? 0) > 0 && !this.vfxManager.isFreeSpinsTheme;
                 const isExitingFreeSpins =
                     this.vfxManager.isFreeSpinsTheme && this.bonusSpins === 0;
+
+                // Add a brief pause before any win explosions/highlights so the player can see the stopped grid
+                if (hasCascade || data.total_win > 0 || isEnteringFreeSpins) {
+                    await this.spinOrchestrator.tweenToEnd(gsap.to({}, { duration: CONFIG.WIN_HIGHLIGHT_DELAY }));
+                }
 
                 if (hasCascade) {
                     this.running = true;
@@ -259,6 +308,7 @@ export class SlotMachine {
                     );
 
                     if (data.total_win > 0) {
+                        this.soundManager.playSFX("sfx_coin");
                         this.balance += data.total_win;
                         this.sessionWins += data.total_win;
                         
@@ -267,7 +317,12 @@ export class SlotMachine {
 
                         if (!this.vfxManager.isFreeSpinsTheme) {
                             this.uiManager.winText.style.fontSize = 100;
-                            this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(data.total_win).toLocaleString()}`;
+                            const isChain = data.slot.cascaded && data.slot.cascaded.length > 1;
+                            if (isChain) {
+                                this.uiManager.winText.text = `TOTAL WIN\n₱${Math.floor(data.total_win).toLocaleString()}`;
+                            } else {
+                                this.uiManager.winText.text = `WIN ₱${Math.floor(data.total_win).toLocaleString()}`;
+                            }
                             this.uiManager.winText.style.fill = 0xffd700;
                             this.uiManager.winText.scale.set(0.01);
                             this.winPresenter.showWin(1);
@@ -284,7 +339,9 @@ export class SlotMachine {
                             s.scale.set((s as unknown as SymbolSprite).baseScale || 1);
                         })
                     );
-                    this.resolveSpinCompletion();
+                    this.telemetry.trackSpin(this.betAmount, data.total_win, isBonusMode);
+                    this.autoSpinConfig.sessionLoss += (this.betAmount - data.total_win);
+                    this.resolveSpinCompletion(data.total_win, isBonusMode);
                     return;
                 }
 
@@ -323,7 +380,11 @@ export class SlotMachine {
                     this.uiManager.updateTextValues(this.balance, displayTotal, this.bonusSpins);
 
                     if (isBonusSpin) {
-                        this.resolveSpinCompletion();
+                        gsap.delayedCall(CONFIG.NORMAL_WIN_DELAY, () => {
+                            this.telemetry.trackSpin(this.betAmount, data.total_win, isBonusMode);
+                            this.autoSpinConfig.sessionLoss += (this.betAmount - data.total_win);
+                            this.resolveSpinCompletion(data.total_win, isBonusMode);
+                        });
                         return;
                     }
 
@@ -336,7 +397,11 @@ export class SlotMachine {
                     gsap.delayedCall(0.5 + 0.8, () => {
                         gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: CONFIG.PANEL_POPUP_SPEED, ease: "back.out(1.7)" });
                     });
-                    gsap.delayedCall(CONFIG.NORMAL_WIN_DELAY, () => { this.resolveSpinCompletion(); });
+                    gsap.delayedCall(CONFIG.NORMAL_WIN_DELAY, () => {
+                        this.telemetry.trackSpin(this.betAmount, data.total_win, isBonusMode);
+                        this.autoSpinConfig.sessionLoss += (this.betAmount - data.total_win);
+                        this.resolveSpinCompletion(data.total_win, isBonusMode);
+                    });
                     return;
                 }
 
@@ -344,6 +409,8 @@ export class SlotMachine {
                     this.running = true;
                     this.uiManager.spinButton.interactive = false;
                     this.uiManager.spinButton.alpha = 0.5;
+                    this.telemetry.trackSpin(this.betAmount, data.total_win, isBonusMode);
+                    this.autoSpinConfig.sessionLoss += (this.betAmount - data.total_win);
                     this.playPurchasedScatterIntro();
                     return;
                 }
@@ -373,21 +440,36 @@ export class SlotMachine {
                                 },
                                 () => {
                                     this.sessionWins = 0;
-                                    this.resolveSpinCompletion();
+                                    this.telemetry.trackSpin(this.betAmount, data.total_win, isBonusMode);
+                                    this.autoSpinConfig.sessionLoss += (this.betAmount - data.total_win);
+                                    this.resolveSpinCompletion(data.total_win, isBonusMode);
                                 },
                             );
                         });
                     });
                     return;
                 }
-
-                this.resolveSpinCompletion();
+                this.telemetry.trackSpin(this.betAmount, data.total_win, isBonusMode);
+                this.autoSpinConfig.sessionLoss += (this.betAmount - data.total_win);
+                this.resolveSpinCompletion(data.total_win, isBonusMode);
             });
         } catch (e) {
             console.error("Backend process failure:", e);
             if (!isBonusSpin) this.balance += this.betAmount;
             this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
-            this.resolveSpinCompletion();
+
+            // Show a user-facing error toast
+            const errMsg = (e instanceof Error) ? e.message : "Server Error";
+            this.uiManager.winText.style.fontSize = 50;
+            this.uiManager.winText.text = `⚠ ${errMsg}\nBet Refunded`;
+            this.uiManager.winText.style.fill = 0xff4444;
+            this.uiManager.winText.scale.set(1);
+            this.winPresenter.showWin(0);
+            gsap.delayedCall(2.5, () => {
+                this.winPresenter.hide();
+                this.uiManager.winText.text = "";
+                this.resolveSpinCompletion(0, isBonusSpin); // Pass 0 win for error case
+            });
         }
     }
 
@@ -395,13 +477,19 @@ export class SlotMachine {
 
     private openBuyFreeSpinsModal() {
         if (this.running || this.vfxManager.isFreeSpinsTheme) return;
+        this.soundManager.playSFX("sfx_button");
         const cost = this.betAmount * CONFIG.BUY_COST_MULTIPLIER;
-        if (this.balance < cost) return;
-        this.uiManager.showBuyFreeSpinsModal(cost, () => { void this.confirmBuyFreeSpins(); });
+        if (this.balance < cost) {
+            this.showInsufficientBalanceMessage();
+            return;
+        }
+        this.buyFreeSpinsModal.show(cost, () => { void this.confirmBuyFreeSpins(); }); // Changed to use this.buyFreeSpinsModal
     }
 
     private async confirmBuyFreeSpins() {
         if (this.running || this.vfxManager.isFreeSpinsTheme) return;
+        this.soundManager.playSFX("sfx_buy");
+        this.buyFreeSpinsModal.hide(); // Hide the modal after confirmation
 
         let purchasedGrid: number[][] | null = null;
         let purchasedBalance: number | null = null;
@@ -520,7 +608,7 @@ export class SlotMachine {
                                     () => {
                                         this.haltUserAutoSpin();
                                         this.running = false;
-                                        this.resolveSpinCompletion();
+                                        this.resolveSpinCompletion(0, true); // 0 win, isBonusMode true
                                     },
                                 );
                             });
@@ -578,18 +666,44 @@ export class SlotMachine {
     handleResize() {
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
-        let scale = Math.min(screenWidth / CONFIG.DESIGN_WIDTH, screenHeight / CONFIG.DESIGN_HEIGHT);
+
+        const isPortrait = screenHeight > screenWidth;
+
+        // In portrait mode, we narrow the target width so the reels scale up to fill screen
+        const targetWidth = isPortrait ? 1200 : CONFIG.DESIGN_WIDTH;
+        const targetHeight = isPortrait ? 2200 : CONFIG.DESIGN_HEIGHT;
+
+        let scale = Math.min(screenWidth / targetWidth, screenHeight / targetHeight);
         scale *= CONFIG.MACHINE_SCALE;
+
+        if (isPortrait) {
+            scale *= 1.35; // Boost phone scale slightly so reels aren't too tiny
+        }
+
         this.mainContainer.scale.set(scale);
+
+        // Center Horizontally
         this.mainContainer.x = screenWidth / 2 + CONFIG.SLOT_OFFSET_X * scale;
-        this.mainContainer.y = screenHeight / 2 + CONFIG.SLOT_OFFSET_Y * scale;
+        // Center Vertically, push down slightly in portrait to make room for jackpots
+        this.mainContainer.y = screenHeight / 2 + (CONFIG.SLOT_OFFSET_Y + (isPortrait ? 250 : 0)) * scale;
 
         if (this.waterBg?.sprite) {
             this.waterBg.sprite.x = screenWidth / 2;
             this.waterBg.sprite.y = screenHeight / 2;
-            this.waterBg.sprite.width = window.innerWidth;
-            this.waterBg.sprite.height = window.innerHeight;
+            this.waterBg.sprite.width = screenWidth;
+            this.waterBg.sprite.height = screenHeight;
         }
+
+        // Broadcast to UI elements to reposition themselves
+        this.uiManager.updateResponsiveLayout(isPortrait);
+        this.leftTopUI.updateResponsiveLayout(isPortrait);
+        this.titleUI.updateResponsiveLayout(isPortrait);
+        this.topUI.updateResponsiveLayout(isPortrait);
+        this.modelUI.updateResponsiveLayout(isPortrait);
+
+        this.uiManager.handleResize(screenWidth, screenHeight, isPortrait); // Changed canvasWidth, canvasHeight to screenWidth, screenHeight
+        if (this.jackpotPresenter) this.jackpotPresenter.handleResize();
+        if (this.buyFreeSpinsModal) this.buyFreeSpinsModal.handleResize(screenWidth, screenHeight); // Added resize call for modal
         this.vfxManager.handleResize();
     }
 
@@ -658,9 +772,17 @@ export class SlotMachine {
     // ── Spin Control ──────────────────────────────────────────────────
 
     startSpin(_fromAutoSpin = false) {
+        if (!this.running && !_fromAutoSpin && !this.freeSpinAutoActive) {
+            this.soundManager.playSFX("sfx_button");
+        }
+        
         if (this.isEditingBet) this.disableBetEditing();
 
         if (this.running) {
+            if (this.bonusSpins > 0) {
+                // Clicking during a free spin pauses the auto-chain
+                this.freeSpinAutoActive = false;
+            }
             this.isQuickSpin = true;
             this.spinOrchestrator.isQuickSpin = true;
             gsap.killTweensOf(this.uiManager.spinButton);
@@ -678,28 +800,45 @@ export class SlotMachine {
         this.isQuickSpin = false;
         this.spinOrchestrator.isQuickSpin = false;
         const isBonusSpin = this.bonusSpins > 0;
-        if (!isBonusSpin && this.balance < this.betAmount) return;
+
+        if (isBonusSpin) {
+            if (_fromAutoSpin) {
+                void this.spinFromBackend(true);
+            } else {
+                if (this.freeSpinDelayTween) {
+                    // Clicked while waiting for delay: PAUSE auto spins.
+                    this.freeSpinDelayTween.kill();
+                    this.freeSpinDelayTween = null;
+                    this.freeSpinAutoActive = false;
+                    this.haltSpinButtonVisuals();
+                    return;
+                } else {
+                    // Start next free spin and RESUME auto playing
+                    this.freeSpinAutoActive = true;
+                    void this.spinFromBackend(true);
+                }
+            }
+            return;
+        }
+
+        if (!isBonusSpin && this.balance < this.betAmount) {
+            this.showInsufficientBalanceMessage();
+            return;
+        }
         void this.spinFromBackend(isBonusSpin);
     }
 
-    private startAutoSpin() {
-        if (this.autoSpinActive) {
-            this.haltUserAutoSpin();
-        } else {
-            this.autoSpinActive = true;
-            this.autoSpinCount = CONFIG.AUTO_SPIN_LIMIT;
+    private startManualAutoSpin(config: any): void {
+        this.autoSpinConfig.stopOnWin = config.stopOnWin;
+        this.autoSpinConfig.stopOnLossLimit = config.stopOnLossLimit;
+        this.autoSpinActive = true;
+        this.autoSpinCount = config.count;
+        this.autoSpinConfig.sessionLoss = 0;
 
-            if (this.bonusSpins > 0) {
-                gsap.to(this.uiManager.spinButton, {
-                    rotation: "+=" + Math.PI * 2, duration: 1.5, repeat: -1, ease: "none",
-                });
-            } else {
-                this.uiManager.autoSpinButton.alpha = 0.8;
-                gsap.to(this.uiManager.autoSpinButton, {
-                    rotation: "+=" + Math.PI * 2, duration: 1.5, repeat: -1, ease: "none",
-                });
-            }
-            this.autoSpinNext();
+        if (this.bonusSpins > 0) {
+            this.startSpin(true);
+        } else {
+            this.startSpin();
         }
     }
 
@@ -708,6 +847,7 @@ export class SlotMachine {
             this.haltUserAutoSpin();
             return;
         }
+        // Re-check balance immediately before firing to guard against race conditions
         if (!this.running && this.balance < this.betAmount && this.bonusSpins === 0) {
             this.haltUserAutoSpin();
             alert("Insufficient Balance");
@@ -719,23 +859,53 @@ export class SlotMachine {
         }
     }
 
-    private resolveSpinCompletion(): void {
+    private resolveSpinCompletion(totalWin: number, isBonusMode: boolean): void {
         this.running = false;
+
+        // AutoSpin Stop Conditions
+        if (this.autoSpinActive && !isBonusMode) {
+            if (this.autoSpinConfig.stopOnWin && totalWin > 0) {
+                this.haltUserAutoSpin();
+                console.log("[AutoSpin] Stopped: Win detected.");
+                return;
+            } else if (this.autoSpinConfig.sessionLoss >= this.autoSpinConfig.stopOnLossLimit) {
+                this.haltUserAutoSpin();
+                console.log("[AutoSpin] Stopped: Loss Limit reached.");
+                return;
+            }
+        }
 
         if (this.bonusSpins > 0) {
             this.uiManager.spinButton.interactive = true;
             this.uiManager.spinButton.alpha = 1;
-            if (this.autoSpinActive) {
+
+            if (this.freeSpinAutoActive || this.autoSpinActive) {
+                // Animate spin button to show it's auto-firing
                 gsap.to(this.uiManager.spinButton, {
-                    rotation: "+=" + Math.PI * 2, duration: 1.5, repeat: -1, ease: "none", overwrite: "auto",
+                    rotation: "+=" + Math.PI * 2, duration: 1.2, repeat: -1, ease: "none", overwrite: "auto",
                 });
-                gsap.delayedCall(CONFIG.AUTO_SPIN_DELAY / 1000, () => {
-                    if (this.autoSpinActive) this.startSpin(true);
+
+                const delay = this.autoSpinActive
+                    ? CONFIG.AUTO_SPIN_DELAY / 1000
+                    : CONFIG.FREE_SPIN_AUTO_DELAY / 1000;
+
+                this.freeSpinDelayTween = gsap.delayedCall(delay, () => {
+                    this.freeSpinDelayTween = null;
+                    if (this.bonusSpins > 0) {
+                        this.startSpin(true);
+                    }
                 });
             } else {
+                // Paused. Waiting for manual click to resume.
                 this.haltSpinButtonVisuals();
             }
             return;
+        } else {
+            this.freeSpinAutoActive = false;
+            if (this.freeSpinDelayTween) {
+                this.freeSpinDelayTween.kill();
+                this.freeSpinDelayTween = null;
+            }
         }
 
         if (this.autoSpinActive) {
@@ -769,5 +939,28 @@ export class SlotMachine {
         gsap.killTweensOf(this.uiManager.spinButton);
         const cur = this.uiManager.spinButton.rotation;
         gsap.to(this.uiManager.spinButton, { rotation: cur + 0.2, duration: 0.3, ease: "power2.out" });
+    }
+
+    /** Shows a brief red on-screen toast when the player cannot afford their bet. */
+    private showInsufficientBalanceMessage(): void {
+        if (this.uiManager.winText.text !== "") return; // Don't stack toasts
+
+        this.uiManager.winText.style.fontSize = 70;
+        this.uiManager.winText.text = "⚠ INSUFFICIENT BALANCE\nPlease lower your bet";
+        this.uiManager.winText.style.fill = 0xff4444;
+        this.uiManager.winText.scale.set(0.01);
+        this.winPresenter.showWin(0);
+
+        gsap.to(this.uiManager.winText.scale, { x: 1, y: 1, duration: 0.4, ease: "back.out(1.7)" });
+        gsap.delayedCall(2.5, () => {
+            gsap.to(this.uiManager.winText.scale, {
+                x: 0, y: 0, duration: 0.2, ease: "power2.in",
+                onComplete: () => {
+                    this.winPresenter.hide();
+                    this.uiManager.winText.text = "";
+                    this.uiManager.winText.style.fill = 0xffd700;
+                },
+            });
+        });
     }
 }
