@@ -123,7 +123,7 @@ export const CONFIG = {
     
     TITLE_BET_X: 550,
     TITLE_BET_Y: 560,
-    TEXT_BET_X: 570,     
+    TEXT_BET_X: 590,     
     TEXT_BET_Y: 595,
     BET_BG_SCALE: 0.6,
     BET_BG_X: 530,

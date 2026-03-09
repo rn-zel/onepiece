@@ -1,10 +1,10 @@
 // src/main.ts
 import { Application, Assets, Texture } from "pixi.js";
 import { SlotMachine } from "./SlotMachine";
-import { ASSETS } from "./Config";
-import { Starfield } from './Starfield'; 
-import { SymbolAnimator } from "./services/SymbolAnimator"
-import { WaterBg } from "./animation/WaterBg";
+import { ASSETS } from "./domain/constants/Config";
+import { Starfield } from './presentation/animation/Starfield'; 
+import { SymbolAnimator } from "./presentation/animation/SymbolAnimator"
+import { WaterBg } from "./presentation/animation/WaterBg";
 
 (async () => {
   try {

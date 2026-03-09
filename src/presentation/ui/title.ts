@@ -1,5 +1,5 @@
 import { Container, Assets, Sprite } from "pixi.js";
-import { CONFIG } from "../Config";
+import { CONFIG } from "../../domain/constants/Config";
 // export class TitleUI {
 //     private container: Container;
 //     private staticSprite: Sprite;

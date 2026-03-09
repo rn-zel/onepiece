@@ -1,5 +1,5 @@
 import { Container, Sprite, Assets, Text } from "pixi.js";
-import { CONFIG } from "../Config";
+import { CONFIG } from "../../domain/constants/Config";
 
 export class TopUI {
     private container: Container;

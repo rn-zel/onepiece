@@ -1,8 +1,8 @@
 import { AnimatedSprite, Spritesheet, Assets, Sprite, Container } from "pixi.js";
-import { CONFIG } from "../Config";
+import { CONFIG } from "../../domain/constants/Config";
 import type { SymbolAnimation } from "./SymbolAnimation";
-import symbolsImagePath from '../assets/symbols.png'; 
-import type { Reel } from "../Reel";
+import symbolsImagePath from '../../assets/symbols.png'; 
+import type { Reel } from "../../domain/entities/Reel";
 
 
 export class SymbolAnimator implements SymbolAnimation {

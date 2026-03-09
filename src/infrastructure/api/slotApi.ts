@@ -148,17 +148,5 @@ export function backendReelToGrid(reel: BackendReel): number[][] {
     finalGrid = indexGrid;
   }
 
-  // ─── DEBUG ────────────────────────────────────────────────────────
-  const NAMES = ["a","k","q","j","s1","s2","s3","s4","wild","sc"];
-  console.group("🎰 backendReelToGrid");
-  console.log("Raw reel from backend (each entry = one column [r0,r1,r2]):");
-  reel.forEach((col, i) => console.log(`  Reel ${i}: ${col.join(", ")}`));
-  console.log("Mapped to indices + final grid [reel][row]:");
-  finalGrid.forEach((col, i) =>
-    console.log(`  Reel ${i}: [${col.join(", ")}]  →  ${col.map(n => NAMES[n] ?? "?").join(" | ")}`)
-  );
-  console.groupEnd();
-  // ─────────────────────────────────────────────────────────────────
-
   return finalGrid;
 }

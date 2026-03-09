@@ -1,6 +1,6 @@
 import { AnimatedSprite, Spritesheet, Assets } from "pixi.js";
 
-import gridImagePath from '../assets/border.png'; 
+import gridImagePath from '../../assets/border.png'; 
 
 export class LightningBorder {
     public sprite!: AnimatedSprite;

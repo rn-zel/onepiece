@@ -1,5 +1,5 @@
 import { AnimatedSprite, Sprite } from "pixi.js";
-import type { Reel } from "../Reel";
+import type { Reel } from "../../domain/entities/Reel";
 import type { LeftTopUI } from "../ui/lefttop";
 
 export interface SymbolAnimation {

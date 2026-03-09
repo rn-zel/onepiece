@@ -1,19 +1,18 @@
-import { Container, Sprite, Graphics, Assets } from "pixi.js";
+import { Container, Sprite, Graphics, Assets, Application } from "pixi.js";
 import gsap from "gsap";
-import { CONFIG } from "./Config";
-import type { Reel } from "./Reel";
-import type { SoundManager } from "./Sound";
-import type { LightningBorder } from "./animation/LightningBorder";
-import { Starfield } from "./Starfield";
-import type { WaterBg } from "./animation/WaterBg";
+import { CONFIG } from "../../domain/constants/Config";
+import type { Reel } from "../../domain/entities/Reel";
+import type { SoundManager } from "../../infrastructure/audio/SoundManager";
+import type { LightningBorder } from "../animation/LightningBorder";
+import { Starfield } from "../animation/Starfield";
+import type { WaterBg } from "../animation/WaterBg";
 
 export class VFXManager {
     public isFreeSpinsTheme: boolean = false;
     private blackHole!: Sprite;
-    private freeSpinBorder: Graphics;
     private lightningOverlay: Graphics;
 
-    private app: any;
+    private app: Application;
     private mainContainer: Container;
     private backgroundContainer: Container;
     private soundManager: SoundManager;
@@ -22,7 +21,7 @@ export class VFXManager {
     public waterBg: WaterBg;
 
     constructor(
-        app: any, 
+        app: Application, 
         mainContainer: Container, 
         backgroundContainer: Container,
         soundManager: SoundManager,
@@ -38,11 +37,9 @@ export class VFXManager {
         this.soundManager = soundManager;
 
         this.waterBg = waterBg;
-        this.freeSpinBorder = new Graphics();
         this.lightningOverlay = new Graphics();
         this.setupLightningOverlay();
         this.starfield = starfield;
-        this.freeSpinBorder = new Graphics();
     }
 
     private setupLightningOverlay() {
@@ -84,35 +81,9 @@ export class VFXManager {
         this.blackHole.y = y;
     }
 
-    setupFreeSpinBorder() {
-        this.freeSpinBorder.rect(-1910 / 2, -1050 / 2, 1890, 1040);
-        this.freeSpinBorder.stroke({ color: 0xFF0055, width: 15 }); 
-        this.freeSpinBorder.alpha = 0; 
-        this.mainContainer.addChild(this.freeSpinBorder);
-    }
 
-    // swapTheme(toFreeSpins: boolean, reels: Reel[]) {
-    //     this.isFreeSpinsTheme = toFreeSpins;
-    //     const bgSprite = this.backgroundContainer.children.find(child => child instanceof Sprite) as Sprite;        
-    //     // change music
-    //     this.soundManager.playBGM(toFreeSpins);
-    //     gsap.delayedCall(1.0, () => this.soundManager.playBGM(toFreeSpins));
-        
-    //     reels.forEach(r => {
-    //         r.isFreeSpins = toFreeSpins;
-    //         if (toFreeSpins) r.removeScattersInstantly(); 
-    //     });
-        
-    //     if (toFreeSpins) {
-    //        if (bgSprite) bgSprite.tint = 0xFF0055;
-    //        if (this.starfield) this.starfield.setTheme(true);
-    //         this.toggleFreeSpinEffects(true); 
-    //     } else {
-    //         if (bgSprite) bgSprite.tint = 0xFFFFFF;
-    //         if (this.starfield) this.starfield.setTheme(false);
-    //         this.toggleFreeSpinEffects(false); 
-    //     }
-    // }
+
+
 
     swapTheme(toFreeSpins: boolean, reels: Reel[]) {
         this.isFreeSpinsTheme = toFreeSpins;
@@ -251,42 +222,7 @@ export class VFXManager {
         });
     }
 
-    private updateLightningBorder() {
-        this.freeSpinBorder.clear();
-        const x = -1920 / 2, y = -1060 / 2, w = 1890, h = 1050;
-        const numberOfBolts = 30; 
-        
-        for (let i = 0; i < numberOfBolts; i++) {
-            this.drawLightningLine(this.freeSpinBorder, x, y, x + w, y);        
-            this.drawLightningLine(this.freeSpinBorder, x + w, y, x + w, y + h);   
-            this.drawLightningLine(this.freeSpinBorder, x + w, y + h, x, y + h);   
-            this.drawLightningLine(this.freeSpinBorder, x, y + h, x, y);          
-        }       
-        this.freeSpinBorder.stroke({ color: 0xFF0055, width: 3, alpha: 0.3, cap: "round", join: "round" });
-    }
 
-    private drawLightningLine(g: Graphics, x1: number, y1: number, x2: number, y2: number) {
-        const segments = 45; 
-        g.moveTo(x1, y1);
-        for (let i = 1; i <= segments; i++) {
-            const t = i / segments;
-            let px = x1 + (x2 - x1) * t;
-            let py = y1 + (y2 - y1) * t;
-            if (i !== segments) {
-                const offset = (Math.random() - 0.3) * 60; 
-                const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
-                px += Math.cos(angle) * offset;
-                py += Math.sin(angle) * offset;
-            }
-            g.lineTo(px, py);
-        }
-    }
-
-    private animateLightningBorder = () => {
-        if (!this.isFreeSpinsTheme) return;
-        this.updateLightningBorder();
-        gsap.delayedCall(0.1, this.animateLightningBorder);
-    }
 
     private triggerRumble() {
         const { x: centerX, y: centerY } = this.getSlotCenter();

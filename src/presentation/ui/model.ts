@@ -1,5 +1,5 @@
 import { Assets, Container, Sprite } from "pixi.js";
-import { CONFIG } from "../Config";
+import { CONFIG } from "../../domain/constants/Config";
 
 export class ModelUI {
     private container: Container;

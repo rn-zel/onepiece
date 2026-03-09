@@ -1,5 +1,6 @@
 import { Container, Sprite, Texture, BlurFilter } from "pixi.js";
-import { CONFIG } from "./Config";
+import { CONFIG } from "../constants/Config";
+import type { SymbolSprite } from "../models/GameTypes";
 
 export class Reel {
   container: Container;
@@ -26,7 +27,7 @@ export class Reel {
       const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
       const scale = Math.min(availableWidth / texture.width, this.symbolSize / texture.height);
       symbol.scale.set(scale);
-      (symbol as any).baseScale = scale;
+      (symbol as unknown as SymbolSprite).baseScale = scale;
       symbol.alpha = 1;
       symbol.rotation = 0;
   }
@@ -74,7 +75,7 @@ export class Reel {
               const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
               const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
               s.scale.set(scale);
-              (s as any).baseScale = scale; 
+              (s as unknown as SymbolSprite).baseScale = scale;
           }
       });
   }
@@ -96,8 +97,8 @@ export class Reel {
       symbol.anchor.set(0.5, 0); 
       symbol.x = this.cardWidth / 2; 
       
-      (symbol as any).baseScale = scale; 
-      (symbol as any).lap = 0; 
+      (symbol as unknown as SymbolSprite).baseScale = scale;
+      (symbol as unknown as SymbolSprite).lap = 0;
       
       this.symbols.push(symbol);
       this.symbolContainer.addChild(symbol);
@@ -114,7 +115,7 @@ export class Reel {
       
       const currentLap = Math.floor((this.position + j) / max);
       
-      if ((s as any).lap !== currentLap) {
+      if ((s as unknown as SymbolSprite).lap !== currentLap) {
        
         let primed = false;
         if (this.finalGrid && this.targetPosition > 0) {
@@ -133,10 +134,10 @@ export class Reel {
             const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
             const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
             s.scale.set(scale);
-            (s as any).baseScale = scale;
+            (s as unknown as SymbolSprite).baseScale = scale;
         }
 
-        (s as any).lap = currentLap; 
+        (s as unknown as SymbolSprite).lap = currentLap;
       }
     });
   }
@@ -175,7 +176,7 @@ export class Reel {
   
   setBrightness(row: number, brightness: number) {
       const symbol = this.getSymbolAtRow(row);
-      const baseScale = (symbol as any).baseScale || 1;
+      const baseScale = (symbol as unknown as SymbolSprite).baseScale || 1;
 
       if (brightness < 1) {
           symbol.tint = 0x555555; 
@@ -191,7 +192,7 @@ export class Reel {
   resetBrightness() {
       this.symbols.forEach(s => {
           s.tint = 0xFFFFFF;
-          const baseScale = (s as any).baseScale || 1;
+          const baseScale = (s as unknown as SymbolSprite).baseScale || 1;
           s.scale.set(baseScale);
       });
   }
