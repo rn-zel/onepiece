@@ -1,6 +1,6 @@
 import { Application, Container, Sprite, Texture, Graphics, AnimatedSprite } from "pixi.js";
 import { CONFIG, DEVICE_TYPES, getDeviceType } from "./domain/constants/Config";
-import * as SlotApi from "./infrastructure/api/slotApi";
+import * as SampleApi from "../sampleAPI";
 import { Reel } from "./domain/entities/Reel";
 import gsap from "gsap";
 import { UIManager } from "./presentation/ui/UIManager";
@@ -199,7 +199,9 @@ export class SlotMachine {
         window.addEventListener("resize", () => this.handleResize());
         this.waterBg.play();
 
-        SlotApi.setSlotApiBaseUrl(CONFIG.API_BASE_URL);
+        // Wire SlotMachine to use the sample Laravel-style API backend (sampleAPI.ts + sample-backend.js)
+        SampleApi.setSlotApiBaseUrl("http://localhost:4000/api/v1");
+        SampleApi.setAuthToken("dev-token");
         void this.loadFromBackend();
     }
 
@@ -207,7 +209,7 @@ export class SlotMachine {
 
     private async loadFromBackend() {
         try {
-            const data = await SlotApi.load();
+            const data = await SampleApi.load();
             this.balance = data.player?.balance ?? this.balance;
             this.bonusSpins = data.free_spin?.count ?? 0;
             this.uiManager.updateTextValues(this.balance, this.lastSpinWin, this.bonusSpins);
@@ -248,13 +250,20 @@ export class SlotMachine {
 
         try {
             const data = isBonusSpin
-                ? await SlotApi.playFreeGame(this.betAmount)
-                : await SlotApi.play(this.betAmount);
+                ? await SampleApi.playFreeGame(this.betAmount)
+                : await SampleApi.play(this.betAmount);
+
+            // If backend returns bet_size / bet_level, sync local bet with it
+            if (typeof data.bet_size === "number" && typeof data.bet_level === "number") {
+                this.betAmount = data.bet_size * data.bet_level;
+                this.uiManager.updateBetTextDisplay(`₱${this.betAmount}`);
+                this.topUI.updateJackpots(this.betAmount);
+            }
 
             this.balance = data.balance;
             this.bonusSpins = data.free_spin?.count ?? 0;
 
-            const grid = SlotApi.backendReelToGrid(data.slot.reel);
+            const grid = SampleApi.backendReelToGrid(data.slot.reel);
             const isBonusMode = isBonusSpin || this.autoSpinActive;
 
             this.spinOrchestrator.animateReels(grid, isBonusMode, async () => {
@@ -265,7 +274,7 @@ export class SlotMachine {
                     this.uiManager.spinButton.interactive = false;
                     this.uiManager.spinButton.alpha = 0.5;
                     
-                    const winAmount = data.jackpot_prizes?.[data.jackpot_type] || 0;
+                    const winAmount = (data.jackpot_prizes?.[data.jackpot_type] as number) || 0;
                     this.soundManager.playSFX("sfx_maxwin");
                     await this.jackpotPresenter.show(data.jackpot_type, winAmount);
                 }
@@ -490,10 +499,10 @@ export class SlotMachine {
         let purchasedFreeSpins: number | null = null;
 
         try {
-            const data = await SlotApi.buyFreeGame(this.betAmount);
+            const data = await SampleApi.buyFreeGame(this.betAmount);
             purchasedBalance = data.balance;
             purchasedFreeSpins = data.free_spin?.count ?? 0;
-            purchasedGrid = SlotApi.backendReelToGrid(data.slot.reel);
+            purchasedGrid = SampleApi.backendReelToGrid(data.slot.reel);
         } catch (e) {
             console.error("Transaction exception during feature purchase:", e);
             return;

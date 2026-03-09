@@ -1,8 +1,8 @@
 import { Container, Graphics, Text, AnimatedSprite } from "pixi.js";
 import gsap from "gsap";
 import { CONFIG } from "../../domain/constants/Config";
-import * as SlotApi from "../../infrastructure/api/slotApi";
-import type { BackendCascadeStep } from "../../infrastructure/api/slotApi";
+import * as SampleApi from "../../../sampleAPI";
+import type { BackendCascadeStep } from "../../../sampleAPI";
 import type { Reel } from "../../domain/entities/Reel";
 import type { UIManager } from "../../presentation/ui/UIManager";
 import type { ParticleEmitter } from "../../presentation/vfx/ParticleEmitter";
@@ -177,7 +177,7 @@ export class CascadeOrchestrator {
 
             // ── Drop new symbols ──
             if (step.rng) {
-                const afterGrid = SlotApi.backendReelToGrid(step.rng);
+                const afterGrid = SampleApi.backendReelToGrid(step.rng);
                 const beforeGrid = this._getVisibleGrid();
                 await this._animateDrop(beforeGrid, afterGrid, winningPositions);
             }

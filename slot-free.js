@@ -11,6 +11,32 @@ let playerBalance = 10000;
 let freeSpinCounter = 0;
 
 // ─────────────────────────────────────────────────────────────
+// Bet helpers — normalize bet / bet_size / bet_level
+// ─────────────────────────────────────────────────────────────
+function resolveBet(req, defaultBet) {
+    // Support Laravel-style payload: { bets: { bet_size, bet_level } }
+    const bets = req.body?.bets;
+    if (bets && typeof bets.bet_size === "number" && typeof bets.bet_level === "number") {
+        const betAmount = bets.bet_size * bets.bet_level;
+        return {
+            betAmount,
+            bet_size: bets.bet_size,
+            bet_level: bets.bet_level,
+        };
+    }
+
+    // Fallback to simple numeric bet (existing behavior)
+    const betAmount = typeof req.body?.bet === "number" ? req.body.bet : defaultBet;
+
+    // Derive bet_size / bet_level from total bet amount.
+    // Base size is fixed at 20, level scales with bet.
+    const bet_size = 20;
+    const bet_level = Math.max(1, Math.round(betAmount / bet_size));
+
+    return { betAmount, bet_size, bet_level };
+}
+
+// ─────────────────────────────────────────────────────────────
 // CONFIG — must stay in sync with Config.ts on the frontend
 // ─────────────────────────────────────────────────────────────
 const CFG_SPINS_ON_SCATTER  = 2;  // Must match frontend "10 SPINS!" text
@@ -326,15 +352,15 @@ app.post("/load", (_req, res) => {
 
 /** POST /play — main game spin */
 app.post("/play", (req, res) => {
-    const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
+    const { betAmount, bet_size, bet_level } = resolveBet(req, 100);
 
-    if (playerBalance < bet) {
+    if (playerBalance < betAmount) {
         return res.status(400).json({ success: false, message: "Insufficient balance." });
     }
 
-    playerBalance -= bet;
+    playerBalance -= betAmount;
     const forceJackpot = req.body?.force_jackpot === true;
-    const result = generatePlayResult(bet, false, false);
+    const result = generatePlayResult(betAmount, false, false);
     
     if (forceJackpot) {
         result.data.jackpot_hit = true;
@@ -344,6 +370,8 @@ app.post("/play", (req, res) => {
 
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
+    result.data.bet_size = bet_size;
+    result.data.bet_level = bet_level;
     res.json(result);
 });
 
@@ -353,8 +381,8 @@ app.post("/play-free-game", (req, res) => {
         return res.status(400).json({ success: false, message: "No free spins remaining." });
     }
     freeSpinCounter--;
-    const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
-    const result = generatePlayResult(bet, true, false);
+    const { betAmount, bet_size, bet_level } = resolveBet(req, 100);
+    const result = generatePlayResult(betAmount, true, false);
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
     result.data.free_spin = {
@@ -362,13 +390,15 @@ app.post("/play-free-game", (req, res) => {
         retrigger: result.data.scatters.retriggered,
         add: result.data.scatters.retriggered ? CFG_SPINS_ON_SCATTER : null,
     };
+    result.data.bet_size = bet_size;
+    result.data.bet_level = bet_level;
     res.json(result);
 });
 
 /** POST /buy-free-game — purchase free spins */
 app.post("/buy-free-game", (req, res) => {
-    const bet = typeof req.body?.bet === "number" ? req.body.bet : 100;
-    const cost = bet * CFG_BUY_COST_MULT;
+    const { betAmount, bet_size, bet_level } = resolveBet(req, 100);
+    const cost = betAmount * CFG_BUY_COST_MULT;
 
     if (playerBalance < cost) {
         return res.status(400).json({ success: false, message: "Insufficient balance to buy free spins." });
@@ -376,10 +406,12 @@ app.post("/buy-free-game", (req, res) => {
 
     playerBalance -= cost;
     freeSpinCounter += CFG_SPINS_ON_BUY;
-    const result = generatePlayResult(bet, false, true);
+    const result = generatePlayResult(betAmount, false, true);
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
     result.data.free_spin = { count: freeSpinCounter, retrigger: false, add: CFG_SPINS_ON_BUY };
+    result.data.bet_size = bet_size;
+    result.data.bet_level = bet_level;
     res.json(result);
 });
 

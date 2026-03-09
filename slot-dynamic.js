@@ -79,6 +79,32 @@ let playerBalance = CFG.INITIAL_BALANCE;
 let freeSpinCounter = 0;
 
 // ─────────────────────────────────────────────────────────────
+// Bet helpers — normalize bet / bet_size / bet_level
+// ─────────────────────────────────────────────────────────────
+function resolveBet(req, defaultBet) {
+    // Support Laravel-style payload: { bets: { bet_size, bet_level } }
+    const bets = req.body?.bets;
+    if (bets && typeof bets.bet_size === "number" && typeof bets.bet_level === "number") {
+        const betAmount = bets.bet_size * bets.bet_level;
+        return {
+            betAmount,
+            bet_size: bets.bet_size,
+            bet_level: bets.bet_level,
+        };
+    }
+
+    // Fallback to simple numeric bet (existing behavior)
+    const betAmount = typeof req.body?.bet === "number" ? req.body.bet : defaultBet;
+
+    // Derive bet_size / bet_level from total bet amount.
+    // Base size is fixed at 20, level scales with bet.
+    const bet_size = 20;
+    const bet_level = Math.max(1, Math.round(betAmount / bet_size));
+
+    return { betAmount, bet_size, bet_level };
+}
+
+// ─────────────────────────────────────────────────────────────
 // Random Grid Generator
 // ─────────────────────────────────────────────────────────────
 function pickSymbol() {
@@ -360,16 +386,20 @@ app.post("/load", (_req, res) => {
 
 /** POST /play — main game spin */
 app.post("/play", (req, res) => {
-    const bet = typeof req.body?.bet === "number" ? req.body.bet : CFG.BET_DEFAULT;
+    const { betAmount, bet_size, bet_level } = resolveBet(req, CFG.BET_DEFAULT);
 
-    if (playerBalance < bet) {
+    if (playerBalance < betAmount) {
         return res.status(400).json({ success: false, message: "Insufficient balance." });
     }
 
-    playerBalance -= bet;
-    const result = generatePlayResult(bet, false, false);
+    playerBalance -= betAmount;
+    const result = generatePlayResult(betAmount, false, false);
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
+
+    // Echo bet decomposition back to client
+    result.data.bet_size = bet_size;
+    result.data.bet_level = bet_level;
 
     res.json(result);
 });
@@ -381,9 +411,9 @@ app.post("/play-free-game", (req, res) => {
     }
 
     freeSpinCounter--;
-    const bet = typeof req.body?.bet === "number" ? req.body.bet : CFG.BET_DEFAULT;
+    const { betAmount, bet_size, bet_level } = resolveBet(req, CFG.BET_DEFAULT);
 
-    const result = generatePlayResult(bet, true, false);
+    const result = generatePlayResult(betAmount, true, false);
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
     result.data.free_spin = {
@@ -392,13 +422,16 @@ app.post("/play-free-game", (req, res) => {
         add: result.data.scatters.retriggered ? CFG.SPINS_ON_SCATTER : null,
     };
 
+    result.data.bet_size = bet_size;
+    result.data.bet_level = bet_level;
+
     res.json(result);
 });
 
 /** POST /buy-free-game — purchase free spins feature */
 app.post("/buy-free-game", (req, res) => {
-    const bet = typeof req.body?.bet === "number" ? req.body.bet : CFG.BET_DEFAULT;
-    const cost = bet * CFG.BUY_COST_MULT;
+    const { betAmount, bet_size, bet_level } = resolveBet(req, CFG.BET_DEFAULT);
+    const cost = betAmount * CFG.BUY_COST_MULT;
 
     if (playerBalance < cost) {
         return res.status(400).json({ success: false, message: "Insufficient balance to buy free spins." });
@@ -407,10 +440,13 @@ app.post("/buy-free-game", (req, res) => {
     playerBalance -= cost;
     freeSpinCounter += CFG.SPINS_ON_BUY;
 
-    const result = generatePlayResult(bet, false, true); // Force scatter display
+    const result = generatePlayResult(betAmount, false, true); // Force scatter display
     playerBalance += result.data.total_win;
     result.data.balance = playerBalance;
     result.data.free_spin = { count: freeSpinCounter, retrigger: false, add: CFG.SPINS_ON_BUY };
+
+    result.data.bet_size = bet_size;
+    result.data.bet_level = bet_level;
 
     res.json(result);
 });

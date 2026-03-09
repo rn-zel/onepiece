@@ -59,6 +59,8 @@ export type BackendPlayData = {
   win: number;
   total_win: number;
   balance: number;
+  bet_size?: number;
+  bet_level?: number;
   free_spin?: BackendFreeSpin | null;
   slot: BackendSlot;
   jackpot_prizes?: Record<string, number> | null;
