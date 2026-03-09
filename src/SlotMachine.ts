@@ -1,5 +1,5 @@
 import { Application, Container, Sprite, Texture, Graphics, AnimatedSprite } from "pixi.js";
-import { CONFIG } from "./domain/constants/Config";
+import { CONFIG, DEVICE_TYPES, getDeviceType } from "./domain/constants/Config";
 import * as SlotApi from "./infrastructure/api/slotApi";
 import { Reel } from "./domain/entities/Reel";
 import gsap from "gsap";
@@ -63,7 +63,6 @@ export class SlotMachine {
     isQuickSpin: boolean = false;
     autoSpinActive: boolean = false;
     autoSpinCount: number = 0;
-    isEditingBet: boolean = false;
     freeSpinAutoActive: boolean = false;
     freeSpinDelayTween: gsap.core.Tween | null = null;
 
@@ -117,7 +116,6 @@ export class SlotMachine {
             () => this.startSpin(),
             () => this.openBuyFreeSpinsModal(),
             (amount: number) => this.adjustBet(amount),
-            () => this.enableBetEditing(),
             (config: any) => this.startManualAutoSpin(config)
         );
 
@@ -130,14 +128,10 @@ export class SlotMachine {
 
         this.uiManager.container.zIndex = 100;
         this.mainContainer.addChild(this.uiManager.container);
-
-        this.uiManager.container.on('betPreset', (amount: number) => {
-            if (!this.running && this.bonusSpins <= 0) {
-                this.betAmount = amount;
-                this.uiManager.updateBetTextDisplay(this.betAmount.toString());
-                this.soundManager.playSFX('sfx_bet');
-            }
-        });
+        
+        // Removed betPreset listener as it's now handled by the modal confirming a delta
+        // If UIManager still emits it, we should remove the emission too.
+        // Actually, UIManager now calls onBetAdjust directly from its betModal onConfirm.
 
         this.uiManager.container.on('turboToggle', (isActive: boolean) => {
             this.spinOrchestrator.isTurbo = isActive;
@@ -193,7 +187,6 @@ export class SlotMachine {
         );
 
         this.vfxManager.setupBlackHole();
-        this.setupBetInput();
 
         this.uiManager.updateBetTextDisplay(`₱${this.betAmount}`);
         this.topUI.updateJackpots(this.betAmount);
@@ -226,7 +219,8 @@ export class SlotMachine {
     private async spinFromBackend(isBonusSpin: boolean) {
         this.running = true;
         this.uiManager.spinButton.interactive = false;
-        this.uiManager.spinButton.alpha = 0.6;
+        // Keep alpha at 1 or only slightly lower to ensure visibility
+        this.uiManager.spinButton.alpha = 0.9;
 
         this.spinOrchestrator.showSpinFeedback(isBonusSpin || this.autoSpinActive);
 
@@ -627,26 +621,43 @@ export class SlotMachine {
         bg.anchor.set(0.5);
         bg.width = 1920 + padding * 2;
         bg.height = 1080 + padding * 2;
-        bg.x = padding + CONFIG.BACKGROUND_OFFSET_X;
+        const isPortrait = this.app.screen.height > this.app.screen.width;
+        const bgOffX = isPortrait ? CONFIG.BACKGROUND_OFFSET_X_PORTRAIT : CONFIG.BACKGROUND_OFFSET_X_LANDSCAPE;
+        bg.x = padding + bgOffX;
         bg.y = padding + 10;
         this.backgroundContainer.addChild(bg);
     }
 
     private createReels() {
+        const screenWidth = this.app.screen.width;
+        const screenHeight = this.app.screen.height;
+        const isPortrait = screenHeight > screenWidth;
+
+        const cardWidth = isPortrait ? CONFIG.CARD_WIDTH_PORTRAIT : CONFIG.CARD_WIDTH_LANDSCAPE;
+        const cardHeight = isPortrait ? CONFIG.CARD_HEIGHT_PORTRAIT : CONFIG.CARD_HEIGHT_LANDSCAPE;
+        const cardSpacing = isPortrait ? CONFIG.CARD_SPACING_PORTRAIT : CONFIG.CARD_SPACING_LANDSCAPE;
+        const reelOffX = isPortrait ? CONFIG.REEL_OFFSET_X_PORTRAIT : CONFIG.REEL_OFFSET_X_LANDSCAPE;
+        const reelOffY = isPortrait ? CONFIG.REEL_OFFSET_Y_PORTRAIT : CONFIG.REEL_OFFSET_Y_LANDSCAPE;
+        const maskPX = isPortrait ? CONFIG.MASK_PX_PORTRAIT : CONFIG.MASK_PX_LANDSCAPE;
+        const maskPY = isPortrait ? CONFIG.MASK_PY_PORTRAIT : CONFIG.MASK_PY_LANDSCAPE;
+        const maskOffY = isPortrait ? CONFIG.MASK_OFFSET_Y_PORTRAIT : CONFIG.MASK_OFFSET_Y_LANDSCAPE;
+        const symbolSize = isPortrait ? CONFIG.SYMBOL_SIZE_PORTRAIT : CONFIG.SYMBOL_SIZE_LANDSCAPE;
+        const symbolSpacing = isPortrait ? CONFIG.SYMBOL_SPACING_PORTRAIT : CONFIG.SYMBOL_SPACING_LANDSCAPE;
+
         const reelCount = CONFIG.REELS_COUNT;
-        const totalWidth = CONFIG.CARD_WIDTH * reelCount + CONFIG.CARD_SPACING * (reelCount - 1);
+        const totalWidth = cardWidth * reelCount + cardSpacing * (reelCount - 1);
         this.reelContainer.pivot.x = totalWidth / 2;
-        this.reelContainer.pivot.y = CONFIG.CARD_HEIGHT / 2.2;
-        this.reelContainer.x = CONFIG.REEL_OFFSET_X;
-        this.reelContainer.y = CONFIG.REEL_OFFSET_Y;
+        this.reelContainer.pivot.y = cardHeight / 2.2;
+        this.reelContainer.x = reelOffX;
+        this.reelContainer.y = reelOffY;
         this.reelContainer.sortableChildren = true;
 
         const mask = new Graphics();
         mask.rect(
-            -CONFIG.MASK_PX,
-            -CONFIG.MASK_PY + CONFIG.MASK_OFFSET_Y,
-            totalWidth + CONFIG.MASK_PX * 2,
-            CONFIG.CARD_HEIGHT + CONFIG.MASK_PY * 2,
+            -maskPX,
+            -maskPY + maskOffY,
+            totalWidth + maskPX * 2,
+            cardHeight + maskPY * 2,
         );
         mask.fill(0xFF0000);
         this.reelContainer.addChild(mask);
@@ -655,37 +666,109 @@ export class SlotMachine {
         for (let i = 0; i < reelCount; i++) {
             const rc = new Container();
             rc.sortableChildren = true;
-            rc.x = i * (CONFIG.CARD_WIDTH + CONFIG.CARD_SPACING);
+            rc.x = i * (cardWidth + cardSpacing);
             this.reelContainer.addChild(rc);
             this.reels.push(
-                new Reel(rc, this.slotTextures, 3, CONFIG.SYMBOL_SIZE, CONFIG.SYMBOL_SPACING, CONFIG.CARD_WIDTH, CONFIG.CARD_HEIGHT),
+                new Reel(rc, this.slotTextures, 3, symbolSize, symbolSpacing, cardWidth, cardHeight),
             );
         }
     }
 
     handleResize() {
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
+        // Use app.screen instead of window, so it respects the max-width/height constraints of the app container
+        const screenWidth = this.app.screen.width;
+        const screenHeight = this.app.screen.height;
 
         const isPortrait = screenHeight > screenWidth;
+        const deviceType = getDeviceType();
 
         // In portrait mode, we narrow the target width so the reels scale up to fill screen
-        const targetWidth = isPortrait ? 1200 : CONFIG.DESIGN_WIDTH;
-        const targetHeight = isPortrait ? 2200 : CONFIG.DESIGN_HEIGHT;
+        const targetWidth = isPortrait ? CONFIG.DESIGN_WIDTH_PORTRAIT : CONFIG.DESIGN_WIDTH_LANDSCAPE;
+        const targetHeight = isPortrait ? CONFIG.DESIGN_HEIGHT_PORTRAIT : CONFIG.DESIGN_HEIGHT_LANDSCAPE;
 
         let scale = Math.min(screenWidth / targetWidth, screenHeight / targetHeight);
-        scale *= CONFIG.MACHINE_SCALE;
-
-        if (isPortrait) {
-            scale *= 1.35; // Boost phone scale slightly so reels aren't too tiny
+        
+        // Select Device + Orientation specific scale
+        let machineScale = isPortrait ? CONFIG.MACHINE_SCALE_PORTRAIT : CONFIG.MACHINE_SCALE_LANDSCAPE;
+        
+        if (deviceType === DEVICE_TYPES.MOBILE) {
+            machineScale = isPortrait ? CONFIG.MACHINE_SCALE_MOBILE_PORTRAIT : CONFIG.MACHINE_SCALE_MOBILE_LANDSCAPE;
+        } else if (deviceType === DEVICE_TYPES.TABLET) {
+            machineScale = isPortrait ? CONFIG.MACHINE_SCALE_TABLET_PORTRAIT : CONFIG.MACHINE_SCALE_TABLET_LANDSCAPE;
+        } else {
+            machineScale = isPortrait ? CONFIG.MACHINE_SCALE_DESKTOP_PORTRAIT : CONFIG.MACHINE_SCALE_DESKTOP_LANDSCAPE;
         }
+
+        scale *= machineScale;
 
         this.mainContainer.scale.set(scale);
 
         // Center Horizontally
-        this.mainContainer.x = screenWidth / 2 + CONFIG.SLOT_OFFSET_X * scale;
-        // Center Vertically, push down slightly in portrait to make room for jackpots
-        this.mainContainer.y = screenHeight / 2 + (CONFIG.SLOT_OFFSET_Y + (isPortrait ? 250 : 0)) * scale;
+        const slotOffX = isPortrait ? CONFIG.SLOT_OFFSET_X_PORTRAIT : CONFIG.SLOT_OFFSET_X_LANDSCAPE;
+        this.mainContainer.x = screenWidth / 2 + slotOffX * scale;
+
+        // Center Vertically with Device-Specific overrides for Portrait
+        let slotOffY = isPortrait ? CONFIG.SLOT_OFFSET_Y_PORTRAIT : CONFIG.SLOT_OFFSET_Y_LANDSCAPE;
+        if (isPortrait) {
+            if (deviceType === DEVICE_TYPES.MOBILE) slotOffY = CONFIG.SLOT_OFFSET_Y_MOBILE_PORTRAIT;
+            else if (deviceType === DEVICE_TYPES.TABLET) slotOffY = CONFIG.SLOT_OFFSET_Y_TABLET_PORTRAIT;
+            else slotOffY = CONFIG.SLOT_OFFSET_Y_DESKTOP_PORTRAIT;
+        }
+
+        this.mainContainer.y = screenHeight / 2 + slotOffY * scale;
+
+        // Inform UI about device type if it has its own logic
+        if (this.uiManager) {
+            this.uiManager.updateResponsiveLayout(isPortrait, deviceType);
+        }
+
+        // Broadcast resize to all modals
+        if (this.uiManager) {
+             this.buyFreeSpinsModal?.handleResize(screenWidth, screenHeight);
+             this.uiManager.handleResize(screenWidth, screenHeight);
+        }
+
+        // Update Reel Geometry
+        const cardWidth = isPortrait ? CONFIG.CARD_WIDTH_PORTRAIT : CONFIG.CARD_WIDTH_LANDSCAPE;
+        const cardHeight = isPortrait ? CONFIG.CARD_HEIGHT_PORTRAIT : CONFIG.CARD_HEIGHT_LANDSCAPE;
+        const cardSpacing = isPortrait ? CONFIG.CARD_SPACING_PORTRAIT : CONFIG.CARD_SPACING_LANDSCAPE;
+        const symbolSize = isPortrait ? CONFIG.SYMBOL_SIZE_PORTRAIT : CONFIG.SYMBOL_SIZE_LANDSCAPE;
+        const symbolSpacing = isPortrait ? CONFIG.SYMBOL_SPACING_PORTRAIT : CONFIG.SYMBOL_SPACING_LANDSCAPE;
+        const reelOffX = isPortrait ? CONFIG.REEL_OFFSET_X_PORTRAIT : CONFIG.REEL_OFFSET_X_LANDSCAPE;
+        const reelOffY = isPortrait ? CONFIG.REEL_OFFSET_Y_PORTRAIT : CONFIG.REEL_OFFSET_Y_LANDSCAPE;
+        const maskPX = isPortrait ? CONFIG.MASK_PX_PORTRAIT : CONFIG.MASK_PX_LANDSCAPE;
+        const maskPY = isPortrait ? CONFIG.MASK_PY_PORTRAIT : CONFIG.MASK_PY_LANDSCAPE;
+        const maskOffY = isPortrait ? CONFIG.MASK_OFFSET_Y_PORTRAIT : CONFIG.MASK_OFFSET_Y_LANDSCAPE;
+
+        const symbolMargin = isPortrait ? CONFIG.SYMBOL_MARGIN_PORTRAIT : CONFIG.SYMBOL_MARGIN_LANDSCAPE;
+
+        const totalWidth = cardWidth * CONFIG.REELS_COUNT + cardSpacing * (CONFIG.REELS_COUNT - 1);
+        this.reelContainer.pivot.x = totalWidth / 2;
+        this.reelContainer.pivot.y = cardHeight / 2.2;
+        this.reelContainer.x = reelOffX;
+        this.reelContainer.y = reelOffY;
+
+        if (this.reelContainer.mask instanceof Graphics) {
+            this.reelContainer.mask.clear();
+            this.reelContainer.mask.rect(
+                -maskPX,
+                -maskPY + maskOffY,
+                totalWidth + maskPX * 2,
+                cardHeight + maskPY * 2,
+            );
+            this.reelContainer.mask.fill(0xFF0000);
+        }
+
+        this.reels.forEach((reel, i) => {
+            reel.container.x = i * (cardWidth + cardSpacing);
+            reel.updateConfig(symbolSize, symbolSpacing, cardWidth, cardHeight, symbolMargin);
+        });
+
+        if (this.backgroundContainer.children[0] instanceof Sprite) {
+            const bg = this.backgroundContainer.children[0];
+            const bgOffX = isPortrait ? CONFIG.BACKGROUND_OFFSET_X_PORTRAIT : CONFIG.BACKGROUND_OFFSET_X_LANDSCAPE;
+            bg.x = 100 + bgOffX;
+        }
 
         if (this.waterBg?.sprite) {
             this.waterBg.sprite.x = screenWidth / 2;
@@ -695,15 +778,12 @@ export class SlotMachine {
         }
 
         // Broadcast to UI elements to reposition themselves
-        this.uiManager.updateResponsiveLayout(isPortrait);
         this.leftTopUI.updateResponsiveLayout(isPortrait);
         this.titleUI.updateResponsiveLayout(isPortrait);
         this.topUI.updateResponsiveLayout(isPortrait);
         this.modelUI.updateResponsiveLayout(isPortrait);
 
-        this.uiManager.handleResize(screenWidth, screenHeight, isPortrait); // Changed canvasWidth, canvasHeight to screenWidth, screenHeight
         if (this.jackpotPresenter) this.jackpotPresenter.handleResize();
-        if (this.buyFreeSpinsModal) this.buyFreeSpinsModal.handleResize(screenWidth, screenHeight); // Added resize call for modal
         this.vfxManager.handleResize();
     }
 
@@ -716,55 +796,8 @@ export class SlotMachine {
         }
     }
 
-    // ── Bet Input ─────────────────────────────────────────────────────
-
-    private setupBetInput() {
-        window.addEventListener("keydown", (e) => {
-            if (!this.isEditingBet) return;
-            if (e.key >= "0" && e.key <= "9") {
-                let current = this.uiManager.betAmountText.text.replace("₱", "").replace("|", "");
-                if (current === "0") current = "";
-                if (current.length < 9) {
-                    this.betAmount = parseInt(current + e.key);
-                    this.uiManager.updateBetTextDisplay(`₱${this.betAmount}|`, true);
-                    this.topUI.updateJackpots(this.betAmount);
-                }
-            } else if (e.key === "Backspace") {
-                let current = this.uiManager.betAmountText.text.replace("₱", "").replace("|", "").slice(0, -1);
-                if (current === "") current = "0";
-                this.betAmount = parseInt(current);
-                this.uiManager.updateBetTextDisplay(`₱${this.betAmount}|`, true);
-                this.topUI.updateJackpots(this.betAmount);
-            } else if (e.key === "Enter" || e.key === "Escape") {
-                this.disableBetEditing();
-            }
-        });
-
-        this.app.stage.eventMode = "static";
-        this.app.stage.hitArea = this.app.screen;
-        this.app.stage.on("pointerdown", (e) => {
-            if (this.isEditingBet && e.target !== this.uiManager.betAmountText) {
-                this.disableBetEditing();
-            }
-        });
-    }
-
-    private enableBetEditing() {
-        if (this.running) return;
-        this.isEditingBet = true;
-        this.uiManager.updateBetTextDisplay(`₱${this.betAmount}|`, true);
-    }
-
-    private disableBetEditing() {
-        this.isEditingBet = false;
-        this.betAmount = Math.max(10, Math.min(1_000_000_000, this.betAmount));
-        this.uiManager.updateBetTextDisplay(`₱${this.betAmount}`);
-        this.topUI.updateJackpots(this.betAmount);
-    }
-
     private adjustBet(amount: number) {
-        if (this.isEditingBet) this.disableBetEditing();
-        this.betAmount = Math.max(10, Math.min(1_000_000_000, this.betAmount + amount));
+        this.betAmount = Math.max(10, Math.min(1000000000, this.betAmount + amount));
         this.uiManager.updateBetTextDisplay(`₱${this.betAmount}`);
         this.topUI.updateJackpots(this.betAmount);
     }
@@ -776,8 +809,6 @@ export class SlotMachine {
             this.soundManager.playSFX("sfx_button");
         }
         
-        if (this.isEditingBet) this.disableBetEditing();
-
         if (this.running) {
             if (this.bonusSpins > 0) {
                 // Clicking during a free spin pauses the auto-chain
@@ -785,11 +816,15 @@ export class SlotMachine {
             }
             this.isQuickSpin = true;
             this.spinOrchestrator.isQuickSpin = true;
-            gsap.killTweensOf(this.uiManager.spinButton);
-            gsap.fromTo(
+            const width = this.app.screen.width;
+            const height = this.app.screen.height;
+            const isPortrait = height > width;
+            const btnScale = isPortrait ? CONFIG.SPIN_BTN_PORTRAIT_SCALE : CONFIG.SPIN_BTN_LANDSCAPE_SCALE;
+
+            gsap.killTweensOf(this.uiManager.spinButton.scale);
+            gsap.to(
                 this.uiManager.spinButton.scale,
-                { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 },
-                { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.2, ease: "back.out(2)" },
+                { x: btnScale, y: btnScale, duration: 0.2, ease: "back.out(2)", overwrite: "auto" },
             );
             this.reels.forEach((r) => {
                 gsap.getTweensOf(r).forEach((tween) => tween.progress(1));

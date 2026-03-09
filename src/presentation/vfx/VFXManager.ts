@@ -1,6 +1,6 @@
 import { Container, Sprite, Graphics, Assets, Application } from "pixi.js";
 import gsap from "gsap";
-import { CONFIG } from "../../domain/constants/Config";
+import { CONFIG, getAppWidth, getAppHeight } from "../../domain/constants/Config";
 import type { Reel } from "../../domain/entities/Reel";
 import type { SoundManager } from "../../infrastructure/audio/SoundManager";
 import type { LightningBorder } from "../animation/LightningBorder";
@@ -63,13 +63,22 @@ export class VFXManager {
     }
 
     private getSlotCenter(): { x: number; y: number; scale: number } {
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        let scale = Math.min(screenWidth / CONFIG.DESIGN_WIDTH, screenHeight / CONFIG.DESIGN_HEIGHT);
-        scale *= CONFIG.MACHINE_SCALE;
+        const screenWidth = getAppWidth();
+        const screenHeight = getAppHeight();
+        const isPortrait = screenHeight > screenWidth;
+
+        const designWidth = isPortrait ? CONFIG.DESIGN_WIDTH_PORTRAIT : CONFIG.DESIGN_WIDTH_LANDSCAPE;
+        const designHeight = isPortrait ? CONFIG.DESIGN_HEIGHT_PORTRAIT : CONFIG.DESIGN_HEIGHT_LANDSCAPE;
+        const machineScale = isPortrait ? CONFIG.MACHINE_SCALE_PORTRAIT : CONFIG.MACHINE_SCALE_LANDSCAPE;
+        const slotOffX = isPortrait ? CONFIG.SLOT_OFFSET_X_PORTRAIT : CONFIG.SLOT_OFFSET_X_LANDSCAPE;
+        const slotOffY = isPortrait ? CONFIG.SLOT_OFFSET_Y_PORTRAIT : CONFIG.SLOT_OFFSET_Y_LANDSCAPE;
+
+        let scale = Math.min(screenWidth / designWidth, screenHeight / designHeight);
+        scale *= machineScale;
+
         return {
-            x: screenWidth / 2 + CONFIG.SLOT_OFFSET_X * scale,
-            y: screenHeight / 2.2 + CONFIG.SLOT_OFFSET_Y * scale,
+            x: screenWidth / 2 + slotOffX * scale,
+            y: screenHeight / 2 + slotOffY * scale,
             scale,
         };
     }

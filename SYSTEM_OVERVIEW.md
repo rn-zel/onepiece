@@ -45,8 +45,9 @@ C:\Users\Trainee\Desktop\BountyRUSH\slot\
         |       SymbolAnimator.ts
         |       Starfield.ts
         |
-        +---ui                   # Static HUD and Input Controls
+        +---ui                   # HUD, Modals, and Input Controls
         |       UIManager.ts
+        |       BetModal.ts      # Specialized Betting Slider Interface
         |       WinPresenter.ts
         |       HelpModal.ts
         |
@@ -66,7 +67,7 @@ Everything related to PixiJS rendering, user input, HTML DOM alignment, and visu
 - **Rules:** 
   - Cannot evaluate logical wins or mutate player balances.
   - Exposes public methods like `showWinPanel()` or `emitGlow()` that higher layers call.
-- **Components:** `UIManager` routes clicks outward to delegates. `VFXManager` manages global visual state overrides (like a Blackhole transition).
+- **Components**: `UIManager` routes clicks outward to delegates. `BetModal` handles specialized input logic via a high-zIndex overlay to prevent background interactions during state mutation. `VFXManager` manages global visual state overrides.
 
 ### 2. Application Layer (`src/application/**`)
 Orchestrates the *order of operations* between multiple layers. The orchestrators receive intent, interact with the Domain, and output commands to the Presentation and Infrastructure layers.

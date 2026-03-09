@@ -1,5 +1,5 @@
 import { Container, Graphics, Text, TextStyle, Assets, Sprite } from "pixi.js";
-import { CONFIG } from "../../domain/constants/Config";
+import { CONFIG, getAppWidth, getAppHeight } from "../../domain/constants/Config";
 import gsap from "gsap";
 
 export class HelpModal {
@@ -46,7 +46,7 @@ export class HelpModal {
     private createUI() {
         // Dark Overlay
         const overlay = new Graphics()
-            .rect(-CONFIG.DESIGN_WIDTH, -CONFIG.DESIGN_HEIGHT, CONFIG.DESIGN_WIDTH * 2, CONFIG.DESIGN_HEIGHT * 2)
+            .rect(-2000, -2000, 4000, 4000) // Large enough to cover any screen
             .fill({ color: 0x000000, alpha: 0.85 });
         overlay.eventMode = "static";
         overlay.cursor = "default";
@@ -54,8 +54,8 @@ export class HelpModal {
         this.modalContainer.addChild(overlay);
 
         // Main Panel
-        const panelWidth = CONFIG.DESIGN_WIDTH;
-        const panelHeight = CONFIG.DESIGN_HEIGHT;
+        const panelWidth = CONFIG.DESIGN_WIDTH_LANDSCAPE;
+        const panelHeight = CONFIG.DESIGN_HEIGHT_LANDSCAPE;
         const panel = new Graphics()
             .rect(-panelWidth/2, -panelHeight/2, panelWidth, panelHeight)
             .fill({ color: 0x15110C, alpha: 1 })
@@ -297,11 +297,40 @@ export class HelpModal {
         this.modalContainer.alpha = 0;
         gsap.to(this.modalContainer, { alpha: 1, duration: 0.3 });
         this.switchTab("payouts");
+        
+        // Immediate alignment
+        this.handleResize(getAppWidth(), getAppHeight());
     }
 
     public hide() {
         gsap.to(this.modalContainer, { alpha: 0, duration: 0.3, onComplete: () => {
             this.modalContainer.visible = false;
         }});
+    }
+
+    public handleResize(width: number, height: number) {
+        const isPortrait = height > width;
+        // Center using global screen coordinates converted into the parent container's space
+        const localCenter = this.parentContainer.toLocal({ x: width / 2, y: height / 2 } as any);
+        this.modalContainer.position.set(localCenter.x, localCenter.y);
+
+        const overlay = this.modalContainer.children[0] as Graphics;
+        if (overlay) {
+            overlay.clear()
+                // Keep overlay large and decoupled from parent scaling/offset
+                .rect(-2000, -2000, 4000, 4000)
+                .fill({ color: 0x000000, alpha: 0.85 });
+        }
+
+        // Adjust panel scale for portrait
+        const panel = this.modalContainer.children[1] as Graphics;
+        if (panel) {
+            const baseScale = isPortrait ? 0.6 : 1.0;
+            this.modalContainer.scale.set(baseScale);
+            
+            // Further scale down if screen is too small
+            const fitScale = Math.min(1, (width * 0.95) / (CONFIG.DESIGN_WIDTH_LANDSCAPE * baseScale));
+            this.modalContainer.scale.set(baseScale * fitScale);
+        }
     }
 }

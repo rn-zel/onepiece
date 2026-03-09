@@ -126,9 +126,9 @@ export class TitleUI {
         this.container = new Container();
         this.titleSprite = new Sprite(Assets.get("title.png"));
         this.titleSprite.anchor.set(0, 0);
-        this.titleSprite.x = CONFIG.TITLE_X;
-        this.titleSprite.y = CONFIG.TITLE_Y;
-        this.titleSprite.scale.set(CONFIG.TITLE_SCALE);
+        this.titleSprite.x = CONFIG.TITLE_LANDSCAPE_X;
+        this.titleSprite.y = CONFIG.TITLE_LANDSCAPE_Y;
+        this.titleSprite.scale.set(CONFIG.TITLE_LANDSCAPE_SCALE);
         this.container.addChild(this.titleSprite);
     }
 

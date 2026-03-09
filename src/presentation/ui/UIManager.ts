@@ -1,8 +1,8 @@
 import { Container, Sprite, Text, TextStyle, Assets, Graphics } from "pixi.js";
-import { CONFIG } from "../../domain/constants/Config";
-import { BuyFreeSpinsModal } from "./BuyFreeSpinsModal";
+import { CONFIG, DEVICE_TYPES, type DeviceType } from "../../domain/constants/Config";
 import { HelpModal } from "./HelpModal";
 import { StatsModal } from "./StatsModal";
+import { BetModal } from "./BetModal";
 import { AutoSpinModal, type AutoSpinConfig } from "./AutoSpinModal";
 
 export class UIManager {
@@ -31,30 +31,26 @@ export class UIManager {
     private winBg!: Sprite;
     private turboButton!: Container;
     private isTurboActive: boolean = false;
-    private betPresetButtons: Container[] = [];
     private statsModal!: StatsModal;
+    private betModal!: BetModal;
     private autoSpinModal!: AutoSpinModal;
 
-    private buyFreeSpinsModal!: BuyFreeSpinsModal;
     private helpModal!: HelpModal;
 
     private onSpin: () => void;
     private onBuyFreeSpins: () => void;
     private onBetAdjust: (amount: number) => void;
-    private onBetEditClick: () => void;
     private onAutoSpinStart: (config: AutoSpinConfig) => void;
 
     constructor(
         onSpin: () => void,
         onBuyFreeSpins: () => void,
         onBetAdjust: (amount: number) => void,
-        onBetEditClick: () => void,
         onAutoSpinStart: (config: AutoSpinConfig) => void
     ) {
         this.onSpin = onSpin;
         this.onBuyFreeSpins = onBuyFreeSpins;
         this.onBetAdjust = onBetAdjust;
-        this.onBetEditClick = onBetEditClick;
         this.onAutoSpinStart = onAutoSpinStart;
         this.createUI();
 
@@ -68,27 +64,27 @@ export class UIManager {
         if (this.autoSpinButton) this.autoSpinButton.zIndex = 20;
         if (this.buyFreeSpinButton) this.buyFreeSpinButton.zIndex = 20;
 
-        this.buyFreeSpinsModal = new BuyFreeSpinsModal(this.container);
         this.helpModal = new HelpModal(this.container);
         this.statsModal = new StatsModal(this.container);
+        this.betModal = new BetModal(this.container, (amt) => this.onBetAdjust(amt - CONFIG.BET_AMOUNT)); // We will update onBetAdjust logic or just use a new callback
         this.autoSpinModal = new AutoSpinModal(this.container, (cfg) => this.onAutoSpinStart(cfg));
     }
 
     private createUI() {
         const glowStyle = new TextStyle({
             fill: 0xffffff, fontSize: 36, fontWeight: "bold",
-            dropShadow: { color: 0x00d9ff, blur: 6, distance: 0, angle: 0 }, align: "center"
+            dropShadow: { color: 0x00d9ff, blur: 6, distance: 0, angle: 0, alpha: 1 }, align: "center"
         });
         const titleStyle = new TextStyle({
             fill: CONFIG.TITLE_LABEL_FILL, fontSize: 22, fontWeight: "bold",
-            dropShadow: { color: CONFIG.TITLE_LABEL_GLOW, blur: 4, distance: 0, angle: 0 }, align: "center"
+            dropShadow: { color: CONFIG.TITLE_LABEL_GLOW, blur: 4, distance: 0, angle: 0, alpha: 1 }, align: "center"
         });
 
         this.buyFreeSpinButton = new Sprite(Assets.get("freespin.png"));
         this.buyFreeSpinButton.anchor.set(0.5);
-        this.buyFreeSpinButton.scale.set(CONFIG.BTN_BUY_FREE_SCALE);
-        this.buyFreeSpinButton.x = CONFIG.BTN_RIGHT_COLUMN_X;
-        this.buyFreeSpinButton.y = CONFIG.BTN_BUY_FREE_Y;
+        this.buyFreeSpinButton.scale.set(CONFIG.BUY_FREE_LANDSCAPE_SCALE);
+        this.buyFreeSpinButton.x = CONFIG.BUY_FREE_LANDSCAPE_X;
+        this.buyFreeSpinButton.y = CONFIG.BUY_FREE_LANDSCAPE_Y;
         this.buyFreeSpinButton.interactive = true;
         this.buyFreeSpinButton.eventMode = "static";
         this.buyFreeSpinButton.cursor = "pointer";
@@ -97,9 +93,9 @@ export class UIManager {
 
         this.spinButton = new Sprite(Assets.get("spinBTN.png"));
         this.spinButton.anchor.set(0.5);
-        this.spinButton.scale.set(CONFIG.SPIN_BTN_SIZE);
-        this.spinButton.x = CONFIG.BTN_SPIN_X;
-        this.spinButton.y = CONFIG.BTN_SPIN_Y;
+        this.spinButton.scale.set(CONFIG.SPIN_BTN_LANDSCAPE_SCALE);
+        this.spinButton.x = CONFIG.SPIN_BTN_LANDSCAPE_X;
+        this.spinButton.y = CONFIG.SPIN_BTN_LANDSCAPE_Y;
         this.spinButton.interactive = true;
         this.spinButton.eventMode = "static";
         this.spinButton.cursor = "pointer";
@@ -108,9 +104,9 @@ export class UIManager {
 
         this.autoSpinButton = new Sprite(Assets.get("autoSpin.png"));
         this.autoSpinButton.anchor.set(0.5);
-        this.autoSpinButton.scale.set(CONFIG.BTN_AUTO_SCALE);
-        this.autoSpinButton.x = CONFIG.BTN_AUTO_X;
-        this.autoSpinButton.y = CONFIG.BTN_AUTO_Y;
+        this.autoSpinButton.scale.set(CONFIG.AUTO_BTN_LANDSCAPE_SCALE);
+        this.autoSpinButton.x = CONFIG.AUTO_BTN_LANDSCAPE_X;
+        this.autoSpinButton.y = CONFIG.AUTO_BTN_LANDSCAPE_Y;
         this.autoSpinButton.interactive = true;
         this.autoSpinButton.cursor = "pointer";
         this.autoSpinButton.on("pointerdown", () => this.autoSpinModal.show());
@@ -119,9 +115,9 @@ export class UIManager {
         // Menu Button
         this.menuButton = new Sprite(Assets.get("menu.png"));
         this.menuButton.anchor.set(0.5);
-        this.menuButton.scale.set(CONFIG.BTN_MENU_SCALE);
-        this.menuButton.x = CONFIG.BTN_MENU_X;
-        this.menuButton.y = CONFIG.BTN_MENU_Y;
+        this.menuButton.scale.set(CONFIG.MENU_BTN_LANDSCAPE_SCALE);
+        this.menuButton.x = CONFIG.MENU_BTN_LANDSCAPE_X;
+        this.menuButton.y = CONFIG.MENU_BTN_LANDSCAPE_Y;
         this.menuButton.eventMode = "static";
         this.menuButton.cursor = "pointer";
         this.menuButton.on("pointerdown", () => {
@@ -131,95 +127,114 @@ export class UIManager {
         this.container.addChild(this.menuButton);
 
         this.statsButton = new Container();
-        const statBg = new Graphics().roundRect(0,0,80,40,8).fill({color: 0x333333, alpha: 0.8});
-        const statTxt = new Text({text: "STATS", style: {fill: "#ffffff", fontSize: 18}});
+        const statBg = new Graphics()
+            .roundRect(0, 0, CONFIG.STATS_BTN_WIDTH, CONFIG.STATS_BTN_HEIGHT, CONFIG.STATS_BTN_RADIUS)
+            .fill({ color: 0x1A1A1A, alpha: 0.85 })
+            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.8 });
+        
+        const statTxt = new Text({ 
+            text: "STATS", 
+            style: { 
+                fill: "#BA8A4C", 
+                fontSize: CONFIG.STATS_BTN_FONT_SIZE, 
+                fontWeight: "900",
+                dropShadow: { color: 0x000000, blur: 2, distance: 1 }
+            } 
+        });
         statTxt.anchor.set(0.5);
-        statTxt.position.set(40,20);
+        statTxt.position.set(CONFIG.STATS_BTN_WIDTH / 2, CONFIG.STATS_BTN_HEIGHT / 2);
         this.statsButton.addChild(statBg, statTxt);
         this.statsButton.eventMode = 'static';
         this.statsButton.cursor = 'pointer';
-        this.statsButton.on('pointerdown', () => this.statsModal.show());
+        this.statsButton.on('pointerdown', () => {
+            gsap.fromTo(this.statsButton.scale, { x: 0.9, y: 0.9 }, { x: 1, y: 1, duration: 0.1 });
+            this.statsModal.show();
+        });
         this.container.addChild(this.statsButton);
 
         // BALANCE 
         this.balanceTitle = new Text({ text: "Balance", style: titleStyle });
         this.balanceTitle.anchor.set(0, 0.5);
-        this.balanceTitle.x = CONFIG.TITLE_BALANCE_X;
-        this.balanceTitle.y = CONFIG.TITLE_BALANCE_Y;
+        this.balanceTitle.x = CONFIG.HUD_BAL_TITLE_LANDSCAPE_X;
+        this.balanceTitle.y = CONFIG.HUD_BAL_TITLE_LANDSCAPE_Y;
         this.balanceTitle.resolution = 3;
         this.balanceTitle.zIndex = 6;
         this.container.addChild(this.balanceTitle);
 
         this.balanceBg = new Sprite(Assets.get("balance.png")); 
         this.balanceBg.anchor.set(0, 0.5); 
-        this.balanceBg.scale.set(CONFIG.BALANCE_BG_SCALE);
-        this.balanceBg.x = CONFIG.BALANCE_BG_X; 
-        this.balanceBg.y = CONFIG.BALANCE_BG_Y;
+        this.balanceBg.scale.set(CONFIG.HUD_BAL_LANDSCAPE_BG_SCALE);
+        this.balanceBg.x = CONFIG.HUD_BAL_BG_LANDSCAPE_X; 
+        this.balanceBg.y = CONFIG.HUD_BAL_BG_LANDSCAPE_Y;
         this.container.addChild(this.balanceBg);
 
         this.balanceText = new Text({ text: "₱0", style: glowStyle });
         this.balanceText.anchor.set(0, 0.5);
-        this.balanceText.x = CONFIG.TEXT_BAL_X; 
-        this.balanceText.y = CONFIG.TEXT_BAL_Y;
+        this.balanceText.x = CONFIG.HUD_BAL_TEXT_LANDSCAPE_X; 
+        this.balanceText.y = CONFIG.HUD_BAL_TEXT_LANDSCAPE_Y;
         this.balanceText.resolution = 3;
         this.container.addChild(this.balanceText);
 
         // BET
         this.betTitle = new Text({ text: "Bet", style: titleStyle });
         this.betTitle.anchor.set(0, 0.5);
-        this.betTitle.x = CONFIG.TITLE_BET_X;
-        this.betTitle.y = CONFIG.TITLE_BET_Y;
+        this.betTitle.x = CONFIG.HUD_BET_TITLE_LANDSCAPE_X;
+        this.betTitle.y = CONFIG.HUD_BET_TITLE_LANDSCAPE_Y;
         this.betTitle.resolution = 3;
         this.betTitle.zIndex = 6;
         this.container.addChild(this.betTitle);
 
         this.betBg = new Sprite(Assets.get("bet.png")); 
         this.betBg.anchor.set(0, 0.5);
-        this.betBg.scale.set(CONFIG.BET_BG_SCALE);
-        this.betBg.x = CONFIG.BET_BG_X; 
-        this.betBg.y = CONFIG.BET_BG_Y;
+        this.betBg.scale.set(CONFIG.HUD_BET_LANDSCAPE_BG_SCALE);
+        this.betBg.x = CONFIG.HUD_BET_BG_LANDSCAPE_X; 
+        this.betBg.y = CONFIG.HUD_BET_BG_LANDSCAPE_Y;
         this.container.addChild(this.betBg);
 
         this.betAmountText = new Text({ text: "₱0", style: glowStyle });
         this.betAmountText.anchor.set(0, 0.5);
-        this.betAmountText.x = CONFIG.TEXT_BET_X;
-        this.betAmountText.y = CONFIG.TEXT_BET_Y;
+        this.betAmountText.x = CONFIG.HUD_BET_TEXT_LANDSCAPE_X;
+        this.betAmountText.y = CONFIG.HUD_BET_TEXT_LANDSCAPE_Y;
         this.betAmountText.resolution = 3;
         this.betAmountText.interactive = true; 
         this.betAmountText.cursor = "text";
         this.betAmountText.eventMode = "static";
-        this.betAmountText.on("pointerdown", this.onBetEditClick);
+        this.betAmountText.on("pointerdown", () => {
+            const balance = parseFloat(this.balanceText.text.replace(/[^0-9.]/g, ''));
+            const currentBet = parseFloat(this.betAmountText.text.replace(/[^0-9.]/g, ''));
+            this.betModal.show(balance, currentBet);
+        });
         this.container.addChild(this.betAmountText);
 
         // TOTAL WIN 
         this.totalWinTitle = new Text({ text: "Total Win", style: titleStyle });
         this.totalWinTitle.anchor.set(0, 0);
-        this.totalWinTitle.x = CONFIG.TITLE_TOTALWIN_X;
-        this.totalWinTitle.y = CONFIG.TITLE_TOTALWIN_Y;
+        this.totalWinTitle.x = CONFIG.HUD_WIN_TITLE_LANDSCAPE_X;
+        this.totalWinTitle.y = CONFIG.HUD_WIN_TITLE_LANDSCAPE_Y;
         this.totalWinTitle.resolution = 3;
         this.totalWinTitle.zIndex = 6;
         this.container.addChild(this.totalWinTitle);
 
         this.winBg = new Sprite(Assets.get("totalwin.png"));
         this.winBg.anchor.set(0, 0.5);
-        this.winBg.scale.set(CONFIG.TOTALWIN_BG_SCALE);
-        this.winBg.x = CONFIG.TOTALWIN_BG_X;
-        this.winBg.y = CONFIG.TOTALWIN_BG_Y;
+        this.winBg.scale.set(CONFIG.HUD_WIN_BG_LANDSCAPE_SCALE);
+        this.winBg.x = CONFIG.HUD_WIN_BG_LANDSCAPE_X;
+        this.winBg.y = CONFIG.HUD_WIN_BG_LANDSCAPE_Y;
         this.container.addChild(this.winBg);
 
         this.totalWinText = new Text({ text: "₱0", style: glowStyle });
         this.totalWinText.anchor.set(0.5, 0.5);
-        this.totalWinText.x = CONFIG.TEXT_TOTALWIN_X;
+        this.totalWinText.x = CONFIG.HUD_WIN_TEXT_LANDSCAPE_X;
         this.totalWinText.resolution = 3;
-        this.totalWinText.y = CONFIG.TEXT_TOTALWIN_Y;
+        this.totalWinText.y = CONFIG.HUD_WIN_TEXT_LANDSCAPE_Y;
         this.container.addChild(this.totalWinText);
 
         // MINUS BUTTON 
         this.minusButton = new Sprite(Assets.get("minus.png"));
         this.minusButton.anchor.set(0.5);
-        this.minusButton.scale.set(CONFIG.BTN_MINUS_SCALE);
-        this.minusButton.x = CONFIG.BTN_MINUS_X;
-        this.minusButton.y = CONFIG.BTN_MINUS_Y;
+        this.minusButton.scale.set(CONFIG.BTN_ADJUST_LANDSCAPE_SCALE);
+        this.minusButton.x = CONFIG.BTN_MINUS_LANDSCAPE_X;
+        this.minusButton.y = CONFIG.BTN_MINUS_LANDSCAPE_Y;
         this.minusButton.interactive = true;
         this.minusButton.eventMode = "static";
         this.minusButton.cursor = "pointer";
@@ -229,9 +244,9 @@ export class UIManager {
         // PLUS BUTTON 
         this.plusButton = new Sprite(Assets.get("plus.png"));
         this.plusButton.anchor.set(0.5);
-        this.plusButton.scale.set(CONFIG.BTN_PLUS_SCALE);
-        this.plusButton.x = CONFIG.BTN_PLUS_X;
-        this.plusButton.y = CONFIG.BTN_PLUS_Y;
+        this.plusButton.scale.set(CONFIG.BTN_ADJUST_LANDSCAPE_SCALE);
+        this.plusButton.x = CONFIG.BTN_PLUS_LANDSCAPE_X;
+        this.plusButton.y = CONFIG.BTN_PLUS_LANDSCAPE_Y;
         this.plusButton.interactive = true;
         this.plusButton.eventMode = "static";
         this.plusButton.cursor = "pointer";
@@ -254,56 +269,53 @@ export class UIManager {
         this.bonusSpinsText.resolution = 2;
         this.container.addChild(this.bonusSpinsText);
 
-        this.createBetPresets();
         this.createTurboToggle();
     }
 
-    private createBetPresets() {
-        const style = new TextStyle({ fill: "#ffffff", fontSize: 24, fontWeight: "bold" });
-        CONFIG.BET_PRESETS.forEach((amount) => {
-            const btn = new Container();
-            const bg = new Graphics().roundRect(0, 0, 80, 40, 8).fill({ color: 0x333333, alpha: 0.8 });
-            const txt = new Text({ text: `₱${amount}`, style });
-            txt.anchor.set(0.5);
-            txt.position.set(40, 20);
-            btn.addChild(bg, txt);
-            btn.eventMode = 'static';
-            btn.cursor = 'pointer';
-            btn.on('pointerdown', () => {
-                this.container.emit('betPreset', amount);
-                gsap.fromTo(btn.scale, { x: 0.9, y: 0.9 }, { x: 1, y: 1, duration: 0.2 });
-            });
-            this.container.addChild(btn);
-            this.betPresetButtons.push(btn);
-        });
-    }
+
 
     private createTurboToggle() {
         this.turboButton = new Container();
-        const bg = new Graphics().roundRect(0, 0, 100, 40, 8).fill({ color: 0x333333, alpha: 0.8 });
-        const txt = new Text({ text: "TURBO", style: { fill: "#555555", fontSize: 20, fontWeight: "bold" } });
+        const bg = new Graphics()
+            .roundRect(0, 0, CONFIG.TURBO_BTN_WIDTH, CONFIG.TURBO_BTN_HEIGHT, CONFIG.TURBO_BTN_RADIUS)
+            .fill({ color: 0x1A1A1A, alpha: 0.85 })
+            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.8 });
+            
+        const style = new TextStyle({ 
+            fill: CONFIG.TURBO_BTN_INACTIVE_COLOR, 
+            fontSize: CONFIG.TURBO_BTN_FONT_SIZE, 
+            fontWeight: "900",
+            dropShadow: { color: 0x000000, blur: 2, distance: 1 }
+        });
+        const txt = new Text({ text: "TURBO", style });
         txt.anchor.set(0.5);
-        txt.position.set(50, 20);
+        txt.position.set(CONFIG.TURBO_BTN_WIDTH / 2, CONFIG.TURBO_BTN_HEIGHT / 2);
         this.turboButton.addChild(bg, txt);
         this.turboButton.eventMode = 'static';
         this.turboButton.cursor = 'pointer';
         this.turboButton.on('pointerdown', () => {
             this.isTurboActive = !this.isTurboActive;
-            (txt.style as TextStyle).fill = this.isTurboActive ? "#ffcc00" : "#555555";
+            (txt.style as TextStyle).fill = this.isTurboActive ? CONFIG.TURBO_BTN_ACTIVE_COLOR : CONFIG.TURBO_BTN_INACTIVE_COLOR;
+            if (this.isTurboActive) {
+                (txt.style as TextStyle).dropShadow = { color: CONFIG.TURBO_BTN_GLOW_COLOR, blur: CONFIG.TURBO_BTN_GLOW_BLUR, distance: 0, alpha: 0.8, angle: 0 };
+            } else {
+                (txt.style as TextStyle).dropShadow = { color: 0x000000, blur: 2, distance: 1, alpha: 1, angle: 0 };
+            }
             this.container.emit('turboToggle', this.isTurboActive);
+            gsap.fromTo(this.turboButton.scale, { x: 0.9, y: 0.9 }, { x: 1, y: 1, duration: 0.1 });
         });
         this.container.addChild(this.turboButton);
     }
 
-    public showBuyFreeSpinsModal(cost: number, onConfirm: () => void, onCancel?: () => void) {
-        this.buyFreeSpinsModal.show(cost, onConfirm, onCancel);
-    }
-
     // bet sizing
     updateBetTextDisplay(textToShow: string, isEditing: boolean = false) {
-        this.betAmountText.text = `${textToShow.toLocaleString()}`;
+        // Ensure Peso sign is always present
+        const display = textToShow.startsWith("₱") ? textToShow : `₱${textToShow}`;
+        this.betAmountText.text = display;
         this.betAmountText.style.fill = isEditing ? 0x00ff00 : 0xffffff;
-        const cleanNumber = textToShow.toLocaleString().replace(/[^0-9]/g, '');
+
+        // Use only digits for size calculation
+        const cleanNumber = display.replace(/[^0-9]/g, '');
         const len = cleanNumber.length;
         let newSize = 36;
         if (len >= 9) newSize = 27;
@@ -313,13 +325,6 @@ export class UIManager {
 
     public showStats() {
         this.statsModal.show();
-    }
-
-    public handleResize(width: number, height: number, isPortrait: boolean) {
-        this.statsModal.handleResize(width, height);
-        this.autoSpinModal.handleResize(width, height);
-        this.buyFreeSpinsModal.handleResize(width, height);
-        this.updateResponsiveLayout(isPortrait);
     }
 
     //  updateBalance, Total Win, Free Spins 
@@ -354,117 +359,130 @@ export class UIManager {
 
     }
 
-    public updateResponsiveLayout(isPortrait: boolean) {
+    public handleResize(width: number, height: number) {
+        this.betModal?.handleResize(width, height);
+        this.autoSpinModal?.handleResize(width, height);
+        this.statsModal?.handleResize(width, height);
+        this.helpModal?.handleResize(width, height);
+    }
+
+    public updateResponsiveLayout(isPortrait: boolean, deviceType: DeviceType = DEVICE_TYPES.DESKTOP) {
+        const isMobile = deviceType === DEVICE_TYPES.MOBILE;
+        const mobileScaleBonus = isMobile ? 1.2 : 1.0;
+
         if (isPortrait) {
             // PORTRAIT (Phone) Layout
-            // Cluster controls at bottom
-            this.spinButton.x = 0;
-            this.spinButton.y = 800;
-            this.spinButton.scale.set(CONFIG.SPIN_BTN_SIZE * 1.2);
+            this.spinButton.x = CONFIG.SPIN_BTN_PORTRAIT_X;
+            this.spinButton.y = CONFIG.SPIN_BTN_PORTRAIT_Y;
+            this.spinButton.scale.set(CONFIG.SPIN_BTN_PORTRAIT_SCALE * mobileScaleBonus);
 
-            this.autoSpinButton.x = 280;
-            this.autoSpinButton.y = 800;
-            this.autoSpinButton.scale.set(CONFIG.BTN_AUTO_SCALE * 1.1);
+            this.autoSpinButton.x = CONFIG.AUTO_BTN_PORTRAIT_X;
+            this.autoSpinButton.y = CONFIG.AUTO_BTN_PORTRAIT_Y;
+            this.autoSpinButton.scale.set(CONFIG.AUTO_BTN_PORTRAIT_SCALE * mobileScaleBonus);
 
-            this.buyFreeSpinButton.x = -280;
-            this.buyFreeSpinButton.y = 800;
-            this.buyFreeSpinButton.scale.set(CONFIG.BTN_BUY_FREE_SCALE * 1.1);
+            this.buyFreeSpinButton.x = CONFIG.BUY_FREE_PORTRAIT_X;
+            this.buyFreeSpinButton.y = CONFIG.BUY_FREE_PORTRAIT_Y;
+            this.buyFreeSpinButton.scale.set(CONFIG.BUY_FREE_PORTRAIT_SCALE * mobileScaleBonus);
 
-            this.menuButton.x = -450;
-            this.menuButton.y = 950;
+            this.menuButton.x = CONFIG.MENU_BTN_PORTRAIT_X;
+            this.menuButton.y = CONFIG.MENU_BTN_PORTRAIT_Y;
+            this.menuButton.scale.set(CONFIG.MENU_BTN_PORTRAIT_SCALE * mobileScaleBonus);
 
             // Balance & Bet (Move to Top)
-            this.balanceTitle.x = -500;
-            this.balanceTitle.y = -950;
-            this.balanceBg.x = -500;
-            this.balanceBg.y = -890;
-            this.balanceText.x = -450;
-            this.balanceText.y = -890;
+            this.balanceTitle.x = CONFIG.HUD_BAL_TITLE_PORTRAIT_X;
+            this.balanceTitle.y = CONFIG.HUD_BAL_TITLE_PORTRAIT_Y;
+            this.balanceBg.x = CONFIG.HUD_BAL_BG_PORTRAIT_X;
+            this.balanceBg.y = CONFIG.HUD_BAL_BG_PORTRAIT_Y;
+            this.balanceBg.scale.set(CONFIG.HUD_BAL_PORTRAIT_BG_SCALE);
+            this.balanceText.x = CONFIG.HUD_BAL_TEXT_PORTRAIT_X;
+            this.balanceText.y = CONFIG.HUD_BAL_TEXT_PORTRAIT_Y;
 
-            this.betTitle.x = 100;
-            this.betTitle.y = -950;
-            this.betBg.x = 100;
-            this.betBg.y = -890;
-            this.betAmountText.x = 200;
-            this.betAmountText.y = -890;
+            this.betTitle.x = CONFIG.HUD_BET_TITLE_PORTRAIT_X;
+            this.betTitle.y = CONFIG.HUD_BET_TITLE_PORTRAIT_Y;
+            this.betBg.x = CONFIG.HUD_BET_BG_PORTRAIT_X;
+            this.betBg.y = CONFIG.HUD_BET_BG_PORTRAIT_Y;
+            this.betBg.scale.set(CONFIG.HUD_BET_PORTRAIT_BG_SCALE);
+            this.betAmountText.x = CONFIG.HUD_BET_TEXT_PORTRAIT_X;
+            this.betAmountText.y = CONFIG.HUD_BET_TEXT_PORTRAIT_Y;
 
-            this.minusButton.x = 140;
-            this.minusButton.y = -890;
-            this.plusButton.x = 440;
-            this.plusButton.y = -890;
+            this.minusButton.x = CONFIG.BTN_MINUS_PORTRAIT_X;
+            this.minusButton.y = CONFIG.BTN_MINUS_PORTRAIT_Y;
+            this.minusButton.scale.set(CONFIG.BTN_ADJUST_PORTRAIT_SCALE * mobileScaleBonus);
+            this.plusButton.x = CONFIG.BTN_PLUS_PORTRAIT_X;
+            this.plusButton.y = CONFIG.BTN_PLUS_PORTRAIT_Y;
+            this.plusButton.scale.set(CONFIG.BTN_ADJUST_PORTRAIT_SCALE * mobileScaleBonus);
 
             // Total Win center
-            this.totalWinTitle.x = -200;
-            this.totalWinTitle.y = 480;
-            this.winBg.x = -400;
-            this.winBg.y = 580;
-            this.winBg.scale.set(CONFIG.TOTALWIN_BG_SCALE * 1.2);
-            this.totalWinText.x = 0;
-            this.totalWinText.y = 580;
+            this.totalWinTitle.x = CONFIG.HUD_WIN_TITLE_PORTRAIT_X;
+            this.totalWinTitle.y = CONFIG.HUD_WIN_TITLE_PORTRAIT_Y;
+            this.winBg.x = CONFIG.HUD_WIN_BG_PORTRAIT_X;
+            this.winBg.y = CONFIG.HUD_WIN_BG_PORTRAIT_Y;
+            this.winBg.scale.set(CONFIG.HUD_WIN_BG_PORTRAIT_SCALE);
+            this.totalWinText.x = CONFIG.HUD_WIN_TEXT_PORTRAIT_X;
+            this.totalWinText.y = CONFIG.HUD_WIN_TEXT_PORTRAIT_Y;
 
-            this.winText.y = 100;
+            this.winText.y = CONFIG.WIN_TEXT_PORTRAIT_Y;
 
-            this.turboButton.x = 420;
-            this.turboButton.y = 700;
+            this.statsButton.x = CONFIG.STATS_BTN_PORTRAIT_X;
+            this.statsButton.y = CONFIG.STATS_BTN_PORTRAIT_Y;
 
-            this.betPresetButtons.forEach((btn, i) => {
-                btn.x = -450 + (i * 90);
-                btn.y = 700;
-            });
+            this.turboButton.x = CONFIG.TURBO_BTN_PORTRAIT_X;
+            this.turboButton.y = CONFIG.TURBO_BTN_PORTRAIT_Y;
 
         } else {
             // LANDSCAPE Layout (Default)
-            this.spinButton.x = CONFIG.BTN_SPIN_X;
-            this.spinButton.y = CONFIG.BTN_SPIN_Y;
-            this.spinButton.scale.set(CONFIG.SPIN_BTN_SIZE);
+            this.spinButton.x = CONFIG.SPIN_BTN_LANDSCAPE_X;
+            this.spinButton.y = CONFIG.SPIN_BTN_LANDSCAPE_Y;
+            this.spinButton.scale.set(CONFIG.SPIN_BTN_LANDSCAPE_SCALE * mobileScaleBonus);
 
-            this.autoSpinButton.x = CONFIG.BTN_AUTO_X;
-            this.autoSpinButton.y = CONFIG.BTN_AUTO_Y;
-            this.autoSpinButton.scale.set(CONFIG.BTN_AUTO_SCALE);
+            this.autoSpinButton.x = CONFIG.AUTO_BTN_LANDSCAPE_X;
+            this.autoSpinButton.y = CONFIG.AUTO_BTN_LANDSCAPE_Y;
+            this.autoSpinButton.scale.set(CONFIG.AUTO_BTN_LANDSCAPE_SCALE * mobileScaleBonus);
 
-            this.buyFreeSpinButton.x = CONFIG.BTN_RIGHT_COLUMN_X;
-            this.buyFreeSpinButton.y = CONFIG.BTN_BUY_FREE_Y;
-            this.buyFreeSpinButton.scale.set(CONFIG.BTN_BUY_FREE_SCALE);
+            this.buyFreeSpinButton.x = CONFIG.BUY_FREE_LANDSCAPE_X;
+            this.buyFreeSpinButton.y = CONFIG.BUY_FREE_LANDSCAPE_Y;
+            this.buyFreeSpinButton.scale.set(CONFIG.BUY_FREE_LANDSCAPE_SCALE * mobileScaleBonus);
 
-            this.menuButton.x = CONFIG.BTN_MENU_X;
-            this.menuButton.y = CONFIG.BTN_MENU_Y;
+            this.menuButton.x = CONFIG.MENU_BTN_LANDSCAPE_X;
+            this.menuButton.y = CONFIG.MENU_BTN_LANDSCAPE_Y;
+            this.menuButton.scale.set(CONFIG.MENU_BTN_LANDSCAPE_SCALE * mobileScaleBonus);
 
-            this.balanceTitle.x = CONFIG.TITLE_BALANCE_X;
-            this.balanceTitle.y = CONFIG.TITLE_BALANCE_Y;
-            this.balanceBg.x = CONFIG.BALANCE_BG_X;
-            this.balanceBg.y = CONFIG.BALANCE_BG_Y;
-            this.balanceText.x = CONFIG.TEXT_BAL_X;
-            this.balanceText.y = CONFIG.TEXT_BAL_Y;
+            this.balanceTitle.x = CONFIG.HUD_BAL_TITLE_LANDSCAPE_X;
+            this.balanceTitle.y = CONFIG.HUD_BAL_TITLE_LANDSCAPE_Y;
+            this.balanceBg.scale.set(CONFIG.HUD_BAL_LANDSCAPE_BG_SCALE);
+            this.balanceText.x = CONFIG.HUD_BAL_TEXT_LANDSCAPE_X;
+            this.balanceText.y = CONFIG.HUD_BAL_TEXT_LANDSCAPE_Y;
 
-            this.betTitle.x = CONFIG.TITLE_BET_X;
-            this.betTitle.y = CONFIG.TITLE_BET_Y;
-            this.betBg.x = CONFIG.BET_BG_X;
-            this.betBg.y = CONFIG.BET_BG_Y;
-            this.betAmountText.x = CONFIG.TEXT_BET_X;
-            this.betAmountText.y = CONFIG.TEXT_BET_Y;
+            this.betTitle.x = CONFIG.HUD_BET_TITLE_LANDSCAPE_X;
+            this.betTitle.y = CONFIG.HUD_BET_TITLE_LANDSCAPE_Y;
+            this.betBg.x = CONFIG.HUD_BET_BG_LANDSCAPE_X;
+            this.betBg.y = CONFIG.HUD_BET_BG_LANDSCAPE_Y;
+            this.betBg.scale.set(CONFIG.HUD_BET_LANDSCAPE_BG_SCALE);
+            this.betAmountText.x = CONFIG.HUD_BET_TEXT_LANDSCAPE_X;
+            this.betAmountText.y = CONFIG.HUD_BET_TEXT_LANDSCAPE_Y;
 
-            this.minusButton.x = CONFIG.BTN_MINUS_X;
-            this.minusButton.y = CONFIG.BTN_MINUS_Y;
-            this.plusButton.x = CONFIG.BTN_PLUS_X;
-            this.plusButton.y = CONFIG.BTN_PLUS_Y;
+            this.minusButton.x = CONFIG.BTN_MINUS_LANDSCAPE_X;
+            this.minusButton.y = CONFIG.BTN_MINUS_LANDSCAPE_Y;
+            this.minusButton.scale.set(CONFIG.BTN_ADJUST_LANDSCAPE_SCALE * mobileScaleBonus);
+            this.plusButton.x = CONFIG.BTN_PLUS_LANDSCAPE_X;
+            this.plusButton.y = CONFIG.BTN_PLUS_LANDSCAPE_Y;
+            this.plusButton.scale.set(CONFIG.BTN_ADJUST_LANDSCAPE_SCALE * mobileScaleBonus);
 
-            this.totalWinTitle.x = CONFIG.TITLE_TOTALWIN_X;
-            this.totalWinTitle.y = CONFIG.TITLE_TOTALWIN_Y;
-            this.winBg.x = CONFIG.TOTALWIN_BG_X;
-            this.winBg.y = CONFIG.TOTALWIN_BG_Y;
-            this.winBg.scale.set(CONFIG.TOTALWIN_BG_SCALE);
-            this.totalWinText.x = CONFIG.TEXT_TOTALWIN_X;
-            this.totalWinText.y = CONFIG.TEXT_TOTALWIN_Y;
+            this.totalWinTitle.x = CONFIG.HUD_WIN_TITLE_LANDSCAPE_X;
+            this.totalWinTitle.y = CONFIG.HUD_WIN_TITLE_LANDSCAPE_Y;
+            this.winBg.x = CONFIG.HUD_WIN_BG_LANDSCAPE_X;
+            this.winBg.y = CONFIG.HUD_WIN_BG_LANDSCAPE_Y;
+            this.winBg.scale.set(CONFIG.HUD_WIN_BG_LANDSCAPE_SCALE);
+            this.totalWinText.x = CONFIG.HUD_WIN_TEXT_LANDSCAPE_X;
+            this.totalWinText.y = CONFIG.HUD_WIN_TEXT_LANDSCAPE_Y;
 
-            this.winText.y = 0;
+            this.winText.y = CONFIG.WIN_TEXT_LANDSCAPE_Y;
 
-            this.turboButton.x = 980;
-            this.turboButton.y = 480;
+            this.statsButton.x = CONFIG.STATS_BTN_LANDSCAPE_X;
+            this.statsButton.y = CONFIG.STATS_BTN_LANDSCAPE_Y;
 
-            this.betPresetButtons.forEach((btn, i) => {
-                btn.x = 980;
-                btn.y = 550 + (i * 50);
-            });
+            this.turboButton.x = CONFIG.TURBO_BTN_LANDSCAPE_X;
+            this.turboButton.y = CONFIG.TURBO_BTN_LANDSCAPE_Y;
         }
     }
 }

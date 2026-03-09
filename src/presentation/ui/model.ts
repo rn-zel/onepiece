@@ -11,9 +11,9 @@ export class ModelUI {
         this.modelSprite = new Sprite(Assets.get("model.png"));
         this.modelSprite.anchor.set(0, 0);
         
-        this.modelSprite.x = CONFIG.MODEL_X;
-        this.modelSprite.y = CONFIG.MODEL_Y;
-        this.modelSprite.scale.set(CONFIG.MODEL_SCALE);
+        this.modelSprite.x = CONFIG.MODEL_LANDSCAPE_X;
+        this.modelSprite.y = CONFIG.MODEL_LANDSCAPE_Y;
+        this.modelSprite.scale.set(CONFIG.MODEL_LANDSCAPE_SCALE);
 
         this.container.addChild(this.modelSprite);
     }

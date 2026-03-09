@@ -8,14 +8,14 @@ import { WaterBg } from "./presentation/animation/WaterBg";
 
 (async () => {
   try {
+    const container = document.getElementById('app-container')!;
     const app = new Application();
     await app.init({ 
-        // background: 0x000000, 
-        resizeTo: window, 
+        resizeTo: container, 
         resolution: window.devicePixelRatio, 
         autoDensity: true 
     });
-    document.body.appendChild(app.canvas);
+    container.appendChild(app.canvas);
 
     //  assets
     await Assets.load([...ASSETS.TEXTURES, ...ASSETS.UI, 

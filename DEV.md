@@ -23,7 +23,7 @@ Before writing any logic, identify your Bounded Context:
 - **3. Presentation (`src/presentation/`)**
   - **What it is:** The PixiJS Stage, Visual Timelines, Particle Effects, and UI.
   - **Rule:** *It cannot dictate game outcomes, parse JSON, or track logic-critical state. It only reacts to public method invocations from the Application layer.*
-  - **Examples:** `WinPresenter`, `SymbolAnimator`, `VFXManager`.
+  - **Examples:** `WinPresenter`, `BetModal`, `SymbolAnimator`, `VFXManager`.
 
 - **4. Infrastructure (`src/infrastructure/`)**
   - **What it is:** Browsers Adapters, APIs, Audio Contexts.

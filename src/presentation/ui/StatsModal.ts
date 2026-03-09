@@ -1,4 +1,5 @@
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
+import { getAppWidth, getAppHeight } from "../../domain/constants/Config";
 import { TelemetryService } from "../../domain/services/TelemetryService";
 
 export class StatsModal {
@@ -14,7 +15,7 @@ export class StatsModal {
         parent.addChild(this.container);
 
         this.overlay = new Graphics();
-        this.overlay.rect(0, 0, 1920, 1080);
+        this.overlay.rect(-2000, -2000, 4000, 4000);
         this.overlay.fill({ color: 0x000000, alpha: 0.85 });
         this.overlay.interactive = true;
         this.overlay.on('pointerdown', () => this.hide());
@@ -23,25 +24,52 @@ export class StatsModal {
         this.content = new Container();
         this.container.addChild(this.content);
 
-        const bg = new Graphics();
-        bg.roundRect(-400, -300, 800, 600, 20);
-        bg.fill({ color: 0x1a1a1a });
-        bg.stroke({ color: 0xffd700, width: 4 });
+        const bg = new Graphics()
+            .roundRect(-420, -320, 840, 640, 24)
+            .fill({ color: 0x15110C, alpha: 0.98 })
+            .stroke({ color: 0xBA8A4C, width: 4, alpha: 0.9 });
         this.content.addChild(bg);
 
-        const titleStyle = new TextStyle({ fill: "#ffd700", fontSize: 48, fontWeight: "bold" });
+        // Header Bar
+        const header = new Graphics()
+            .roundRect(-420, -320, 840, 80, 24)
+            .fill({ color: 0xBA8A4C, alpha: 0.2 })
+            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.5 });
+        this.content.addChild(header);
+
+        const titleStyle = new TextStyle({ 
+            fill: "#FFD700", 
+            fontSize: 42, 
+            fontWeight: "900",
+            dropShadow: { color: 0x000000, blur: 4, distance: 2, angle: 0 }
+        });
         const title = new Text({ text: "SESSION STATISTICS", style: titleStyle });
         title.anchor.set(0.5);
-        title.y = -240;
+        title.y = -280;
         this.content.addChild(title);
 
-        this.content.x = 1920 / 2;
-        this.content.y = 1080 / 2;
+        // Close Button (X)
+        const closeBtn = new Container();
+        const closeBg = new Graphics().circle(0, 0, 25).fill({ color: 0xBA8A4C, alpha: 0.3 }).stroke({ color: 0xBA8A4C, width: 2 });
+        const closeTxt = new Text({ text: "✕", style: { fill: "#FFD700", fontSize: 24, fontWeight: "bold" } });
+        closeTxt.anchor.set(0.5);
+        closeBtn.addChild(closeBg, closeTxt);
+        closeBtn.position.set(380, -280);
+        closeBtn.eventMode = 'static';
+        closeBtn.cursor = 'pointer';
+        closeBtn.on('pointerdown', () => this.hide());
+        this.content.addChild(closeBtn);
+
+        this.content.x = 0;
+        this.content.y = 0;
     }
 
     public show() {
         this.container.visible = true;
         this.renderStats();
+        
+        // Immediate alignment
+        this.handleResize(getAppWidth(), getAppHeight());
     }
 
     public hide() {
@@ -49,37 +77,77 @@ export class StatsModal {
     }
 
     private renderStats() {
-        // Clear previous stats
-        this.content.children.forEach((child, i) => {
-            if (i > 2) this.content.removeChild(child); // Keep bg and title
-        });
+        // Clear previous stats (children after header/title/bg/closeBtn)
+        while (this.content.children.length > 4) {
+            this.content.removeChildAt(4);
+        }
 
         const stats = this.telemetry.getSessionStats();
-        const style = new TextStyle({ fill: "#ffffff", fontSize: 32 });
 
         const labels = [
-            `Total Wagered: ₱${stats.totalWagered.toLocaleString()}`,
-            `Total Won: ₱${stats.totalWon.toLocaleString()}`,
-            `Net Profit/Loss: ₱${(stats.totalWon - stats.totalWagered).toLocaleString()}`,
-            `Session RTP: ${stats.rtp.toFixed(2)}%`,
-            `Total Spins: ${stats.spinsCount}`,
-            `Free Spins Hit: ${stats.bonusSpinsCount}`,
-            `Session Duration: ${stats.duration}s`
+            ["Total Wagered", `₱${stats.totalWagered.toLocaleString()}`],
+            ["Total Won", `₱${stats.totalWon.toLocaleString()}`],
+            ["Net Profit/Loss", `₱${(stats.totalWon - stats.totalWagered).toLocaleString()}`],
+            ["Session RTP", `${stats.rtp.toFixed(2)}%`],
+            ["Total Spins", `${stats.spinsCount}`],
+            ["Free Spins Hit", `${stats.bonusSpinsCount}`],
+            ["Session Duration", `${Math.floor(stats.duration / 60)}m ${stats.duration % 60}s`]
         ];
 
-        labels.forEach((text, i) => {
-            const t = new Text({ text, style });
-            t.anchor.set(0.5);
-            t.y = -140 + (i * 50);
-            this.content.addChild(t);
+        const labelStyle = new TextStyle({ fill: "#BA8A4C", fontSize: 28, fontWeight: "700" });
+        const valStyle = new TextStyle({ fill: "#FFFFFF", fontSize: 28, fontWeight: "500" });
+
+        labels.forEach((pair, i) => {
+            const rowY = -160 + (i * 60);
+            
+            // Draw a subtle row separator
+            const line = new Graphics().moveTo(-350, rowY + 35).lineTo(350, rowY + 35).stroke({ color: 0xBA8A4C, width: 1, alpha: 0.2 });
+            this.content.addChild(line);
+
+            const lab = new Text({ text: pair[0], style: labelStyle });
+            lab.anchor.set(0, 0.5);
+            lab.x = -350;
+            lab.y = rowY;
+            
+            const val = new Text({ text: pair[1], style: valStyle });
+            val.anchor.set(1, 0.5);
+            val.x = 350;
+            val.y = rowY;
+            
+            if (pair[0] === "Net Profit/Loss") {
+                const diff = stats.totalWon - stats.totalWagered;
+                val.style.fill = diff >= 0 ? 0x00FF00 : 0xFF4444;
+            }
+
+            this.content.addChild(lab, val);
         });
     }
 
     public handleResize(width: number, height: number) {
+        const isPortrait = height > width;
+        // Center using global screen coordinates converted into the parent container's space
+        const parent = this.container.parent as Container | null;
+        if (parent) {
+            const localCenter = parent.toLocal({ x: width / 2, y: height / 2 } as any);
+            this.container.position.set(localCenter.x, localCenter.y);
+        }
+        
         this.overlay.clear();
-        this.overlay.rect(0, 0, width, height);
+        // Keep overlay large and decoupled from parent scaling/offset
+        this.overlay.rect(-2000, -2000, 4000, 4000);
         this.overlay.fill({ color: 0x000000, alpha: 0.85 });
-        this.content.x = width / 2;
-        this.content.y = height / 2;
+        
+        // Adjust content scale for portrait
+        if (this.content) {
+            const baseScale = isPortrait ? 0.7 : 1.0;
+            this.content.scale.set(baseScale);
+            
+            // Further scale down if screen is too small
+            const fitScale = Math.min(1, (width * 0.95) / (840 * baseScale));
+            this.content.scale.set(baseScale * fitScale);
+        }
+
+        this.content.x = 0;
+        this.content.y = 0;
     }
 }

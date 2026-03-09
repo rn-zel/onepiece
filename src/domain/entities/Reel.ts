@@ -1,5 +1,4 @@
 import { Container, Sprite, Texture, BlurFilter } from "pixi.js";
-import { CONFIG } from "../constants/Config";
 import type { SymbolSprite } from "../models/GameTypes";
 
 export class Reel {
@@ -13,6 +12,7 @@ export class Reel {
   symbolSpacing: number;
   cardWidth: number;
   cardHeight: number;
+  symbolMargin: number;
   symbolContainer: Container;
   isFreeSpins: boolean = false;
   targetPosition: number = -1;
@@ -24,7 +24,7 @@ export class Reel {
       if (!texture) return;
 
       symbol.texture = texture;
-      const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+      const availableWidth = this.cardWidth - (this.symbolMargin * 2);
       const scale = Math.min(availableWidth / texture.width, this.symbolSize / texture.height);
       symbol.scale.set(scale);
       (symbol as unknown as SymbolSprite).baseScale = scale;
@@ -39,7 +39,8 @@ export class Reel {
     symbolSize: number,
     symbolSpacing: number,
     cardWidth: number,
-    cardHeight: number
+    cardHeight: number,
+    symbolMargin: number = 20
   ) {
     this.container = container;
     this.slotTextures = textures;
@@ -48,11 +49,32 @@ export class Reel {
     this.symbolSpacing = symbolSpacing;
     this.cardWidth = cardWidth;
     this.cardHeight = cardHeight;
+    this.symbolMargin = symbolMargin;
     this.symbolContainer = new Container();
 
     this.initSymbols();
     this.symbolContainer.filters = [this.blur];
     this.container.addChild(this.symbolContainer);
+  }
+
+  public updateConfig(symbolSize: number, symbolSpacing: number, cardWidth: number, cardHeight: number, symbolMargin: number) {
+    this.symbolSize = symbolSize;
+    this.symbolSpacing = symbolSpacing;
+    this.cardWidth = cardWidth;
+    this.cardHeight = cardHeight;
+    this.symbolMargin = symbolMargin;
+    
+    // Reposition and rescale existing symbols
+    this.symbols.forEach((s) => {
+        const texture = s.texture;
+        const availableWidth = this.cardWidth - (this.symbolMargin * 2);
+        const scale = Math.min(availableWidth / texture.width, this.symbolSize / texture.height);
+        s.scale.set(scale);
+        (s as unknown as SymbolSprite).baseScale = scale;
+        s.x = this.cardWidth / 2;
+    });
+    
+    this.updateSymbols(); // Reflow Y positions
   }
 
  randomTexture(): Texture {
@@ -72,7 +94,7 @@ export class Reel {
               s.texture = this.randomTexture(); 
               
               // Recalculate scale safely
-              const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+              const availableWidth = this.cardWidth - (this.symbolMargin * 2);
               const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
               s.scale.set(scale);
               (s as unknown as SymbolSprite).baseScale = scale;
@@ -90,7 +112,7 @@ export class Reel {
       const yPosition = (j - 1) * (this.symbolSize + this.symbolSpacing);
       symbol.y = yPosition;
       
-      const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+      const availableWidth = this.cardWidth - (this.symbolMargin * 2);
       const scale = Math.min(availableWidth / symbol.width, (this.symbolSize) / symbol.height);
       
       symbol.scale.set(scale);
@@ -131,7 +153,7 @@ export class Reel {
 
         if (!primed) {
             s.texture = this.randomTexture();
-            const availableWidth = this.cardWidth - (CONFIG.SYMBOL_MARGIN * 2);
+            const availableWidth = this.cardWidth - (this.symbolMargin * 2);
             const scale = Math.min(availableWidth / s.texture.width, (this.symbolSize) / s.texture.height);
             s.scale.set(scale);
             (s as unknown as SymbolSprite).baseScale = scale;

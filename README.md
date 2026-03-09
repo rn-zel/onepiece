@@ -50,7 +50,7 @@ The `src/` directory is strictly divided into four functional layers. **The Gold
 │   └── /audio           WebAudio Wrappers (`SoundManager.ts`)
 │
 └── /presentation        ← [UI] PixiJS Rendering & Post-Processing
-    ├── /ui              Menus, HUD, Text Modals (`UIManager`, `HelpModal`)
+    ├── /ui              Menus, HUD, Modals (`UIManager`, `BetModal`, `HelpModal`)
     ├── /vfx             Particles, Layout Shaders (`VFXManager`)
     └── /animation       Stateful visual actors (`SymbolAnimator`)
 ```
@@ -59,6 +59,7 @@ The `src/` directory is strictly divided into four functional layers. **The Gold
 1. **Single Responsibility Principle (SRP):** If a class handles DOM clicks, it *cannot* calculate winning paylines.
 2. **Open/Closed Principle (OCP):** New win mechanics (like Cluster Pays) should be implemented by creating a new `WinEvaluator`, not by modifying existing ones `if (mode === 'cluster')`.
 3. **Dependency Inversion (DIP):** Presentation layers rely on abstractions. The `SlotMachine` composition root injects concrete instances (like `ParticleEmitter`) into orchestrators via their constructors.
+- **Components**: `UIManager` routes clicks outward to delegates. `BetModal` handles specialized input logic via a high-zIndex overlay to prevent background interactions during state mutation. `VFXManager` manages global visual state overrides.
 
 ---
 

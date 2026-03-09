@@ -19,9 +19,9 @@ export class TopUI {
         this.container = new Container();
 
         this.miniContainer = new Container();
-        this.miniContainer.x = CONFIG.TOP_MINI_X;
-        this.miniContainer.y = CONFIG.TOP_MINI_Y;
-        this.miniContainer.scale.set(CONFIG.TOP_MINI_SCALE);
+        this.miniContainer.x = CONFIG.JACKPOT_MINI_LANDSCAPE_X;
+        this.miniContainer.y = CONFIG.JACKPOT_MINI_LANDSCAPE_Y;
+        this.miniContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
         this.container.addChild(this.miniContainer);
         
         this.miniSprite = new Sprite(Assets.get("mini.png"));
@@ -29,19 +29,19 @@ export class TopUI {
         this.miniContainer.addChild(this.miniSprite);
 
         this.miniText = this.createJackpotText(
-            CONFIG.TOP_MINI_TEXT_X, 
-            CONFIG.TOP_MINI_TEXT_Y,
-            CONFIG.TOP_MINI_TEXT_COLOR,
-            CONFIG.TOP_MINI_TEXT_SIZE,
-            CONFIG.TOP_MINI_TEXT_STROKE_COLOR,
-            CONFIG.TOP_MINI_TEXT_STROKE_WIDTH
+            380, // Text Offset X (Hardcoded for now as it's a relative offset)
+            200, // Text Offset Y
+            0x9C7740,
+            60,
+            0x000000,
+            4
         );
         this.miniContainer.addChild(this.miniText);
         
         this.majorContainer = new Container();
-        this.majorContainer.x = CONFIG.TOP_MAJOR_X;
-        this.majorContainer.y = CONFIG.TOP_MAJOR_Y;
-        this.majorContainer.scale.set(CONFIG.TOP_MAJOR_SCALE);
+        this.majorContainer.x = CONFIG.JACKPOT_MAJOR_LANDSCAPE_X;
+        this.majorContainer.y = CONFIG.JACKPOT_MAJOR_LANDSCAPE_Y;
+        this.majorContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
         this.container.addChild(this.majorContainer);
 
         this.majorSprite = new Sprite(Assets.get("major.png"));
@@ -49,19 +49,19 @@ export class TopUI {
         this.majorContainer.addChild(this.majorSprite);
 
         this.majorText = this.createJackpotText(
-            CONFIG.TOP_MAJOR_TEXT_X, 
-            CONFIG.TOP_MAJOR_TEXT_Y,
-            CONFIG.TOP_MAJOR_TEXT_COLOR,
-            CONFIG.TOP_MAJOR_TEXT_SIZE,
-            CONFIG.TOP_MAJOR_TEXT_STROKE_COLOR,
-            CONFIG.TOP_MAJOR_TEXT_STROKE_WIDTH
+            380,
+            200,
+            0x9C7740,
+            60,
+            0x000000,
+            4
         );
         this.majorContainer.addChild(this.majorText);
 
         this.grandContainer = new Container();
-        this.grandContainer.x = CONFIG.TOP_GRAND_X;
-        this.grandContainer.y = CONFIG.TOP_GRAND_Y;
-        this.grandContainer.scale.set(CONFIG.TOP_GRAND_SCALE);
+        this.grandContainer.x = CONFIG.JACKPOT_GRAND_LANDSCAPE_X;
+        this.grandContainer.y = CONFIG.JACKPOT_GRAND_LANDSCAPE_Y;
+        this.grandContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
         this.container.addChild(this.grandContainer);
 
         this.grandSprite = new Sprite(Assets.get("grand.png"));
@@ -69,12 +69,12 @@ export class TopUI {
         this.grandContainer.addChild(this.grandSprite);
 
         this.grandText = this.createJackpotText(
-            CONFIG.TOP_GRAND_TEXT_X, 
-            CONFIG.TOP_GRAND_TEXT_Y,
-            CONFIG.TOP_GRAND_TEXT_COLOR,
-            CONFIG.TOP_GRAND_TEXT_SIZE,
-            CONFIG.TOP_GRAND_TEXT_STROKE_COLOR,
-            CONFIG.TOP_GRAND_TEXT_STROKE_WIDTH
+            420,
+            200,
+            0x9C7740,
+            60,
+            0x000000,
+            4
         );
         this.grandContainer.addChild(this.grandText);
     }
@@ -113,29 +113,29 @@ export class TopUI {
 
     public updateResponsiveLayout(isPortrait: boolean) {
         if (isPortrait) {
-            this.miniContainer.x = -400;
-            this.miniContainer.y = -1050;
-            this.miniContainer.scale.set(0.65);
+            this.miniContainer.x = CONFIG.JACKPOT_MINI_PORTRAIT_X;
+            this.miniContainer.y = CONFIG.JACKPOT_MINI_PORTRAIT_Y;
+            this.miniContainer.scale.set(CONFIG.JACKPOT_PORTRAIT_SCALE);
 
-            this.majorContainer.x = 0;
-            this.majorContainer.y = -1050;
-            this.majorContainer.scale.set(0.65);
+            this.majorContainer.x = CONFIG.JACKPOT_MAJOR_PORTRAIT_X;
+            this.majorContainer.y = CONFIG.JACKPOT_MAJOR_PORTRAIT_Y;
+            this.majorContainer.scale.set(CONFIG.JACKPOT_PORTRAIT_SCALE);
 
-            this.grandContainer.x = 400;
-            this.grandContainer.y = -1050;
-            this.grandContainer.scale.set(0.65);
+            this.grandContainer.x = CONFIG.JACKPOT_GRAND_PORTRAIT_X;
+            this.grandContainer.y = CONFIG.JACKPOT_GRAND_PORTRAIT_Y;
+            this.grandContainer.scale.set(CONFIG.JACKPOT_PORTRAIT_SCALE);
         } else {
-            this.miniContainer.x = CONFIG.TOP_MINI_X;
-            this.miniContainer.y = CONFIG.TOP_MINI_Y;
-            this.miniContainer.scale.set(CONFIG.TOP_MINI_SCALE);
+            this.miniContainer.x = CONFIG.JACKPOT_MINI_LANDSCAPE_X;
+            this.miniContainer.y = CONFIG.JACKPOT_MINI_LANDSCAPE_Y;
+            this.miniContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
 
-            this.majorContainer.x = CONFIG.TOP_MAJOR_X;
-            this.majorContainer.y = CONFIG.TOP_MAJOR_Y;
-            this.majorContainer.scale.set(CONFIG.TOP_MAJOR_SCALE);
+            this.majorContainer.x = CONFIG.JACKPOT_MAJOR_LANDSCAPE_X;
+            this.majorContainer.y = CONFIG.JACKPOT_MAJOR_LANDSCAPE_Y;
+            this.majorContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
 
-            this.grandContainer.x = CONFIG.TOP_GRAND_X;
-            this.grandContainer.y = CONFIG.TOP_GRAND_Y;
-            this.grandContainer.scale.set(CONFIG.TOP_GRAND_SCALE);
+            this.grandContainer.x = CONFIG.JACKPOT_GRAND_LANDSCAPE_X;
+            this.grandContainer.y = CONFIG.JACKPOT_GRAND_LANDSCAPE_Y;
+            this.grandContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
         }
     }
 

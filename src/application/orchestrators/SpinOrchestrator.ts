@@ -1,6 +1,6 @@
 import { AnimatedSprite, Sprite } from "pixi.js";
 import gsap from "gsap";
-import { CONFIG } from "../../domain/constants/Config";
+import { CONFIG, getAppWidth, getAppHeight } from "../../domain/constants/Config";
 import type { Reel } from "../../domain/entities/Reel";
 import type { Texture } from "pixi.js";
 import type { UIManager } from "../../presentation/ui/UIManager";
@@ -66,7 +66,7 @@ export class SpinOrchestrator {
      */
     animateReels(
         targetGrid: number[][] | null,
-        isBonusMode: boolean,
+        _isBonusMode: boolean,
         onDone: () => void,
     ): void {
         this.soundManager.playSFX("sfx_spin");
@@ -82,26 +82,25 @@ export class SpinOrchestrator {
 
         // Spin-button animation
         gsap.killTweensOf(this.uiManager.spinButton);
-        gsap.fromTo(
+        const width = getAppWidth();
+        const height = getAppHeight();
+        const isPortrait = height > width;
+        const btnScale = isPortrait ? CONFIG.SPIN_BTN_PORTRAIT_SCALE : CONFIG.SPIN_BTN_LANDSCAPE_SCALE;
+
+        gsap.to(
             this.uiManager.spinButton.scale,
-            { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 },
-            { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.4, ease: "back.out(2)" },
+            { x: btnScale, y: btnScale, duration: 0.4, ease: "back.out(2)" },
         );
 
-        if (isBonusMode) {
-            gsap.to(this.uiManager.spinButton, {
-                rotation: "+=" + (Math.PI * 2), duration: 1.5, repeat: -1, ease: "none", overwrite: "auto",
-            });
-        } else {
-            gsap.to(this.uiManager.spinButton, {
-                rotation: "+=" + (Math.PI * 100), duration: 2.5, ease: "power4.out",
-                onComplete: () => {
-                    gsap.to(this.uiManager.spinButton, {
-                        rotation: "+=" + (Math.PI * 2), duration: 15, repeat: -1, ease: "none", overwrite: "auto",
-                    });
-                },
-            });
-        }
+        // Use a more intense rotation during reel spin
+        gsap.to(this.uiManager.spinButton, {
+            rotation: "+=" + (Math.PI * 12), duration: 2.0, ease: "power2.in",
+            onComplete: () => {
+                gsap.to(this.uiManager.spinButton, {
+                    rotation: "+=" + (Math.PI * 4), duration: 1, repeat: -1, ease: "none", overwrite: "auto",
+                });
+            },
+        });
 
         // Reset symbol state
         this.clearAnimations();
@@ -197,14 +196,18 @@ export class SpinOrchestrator {
         this.spinAuraSprite = this.particleEmitter.emitAura(this.uiManager.spinButton);
 
         gsap.killTweensOf(this.uiManager.spinButton);
-        gsap.fromTo(
+        const width = getAppWidth();
+        const height = getAppHeight();
+        const isPortrait = height > width;
+        const btnScale = isPortrait ? CONFIG.SPIN_BTN_PORTRAIT_SCALE : CONFIG.SPIN_BTN_LANDSCAPE_SCALE;
+
+        gsap.to(
             this.uiManager.spinButton.scale,
-            { x: CONFIG.SPIN_BTN_SIZE * 0.85, y: CONFIG.SPIN_BTN_SIZE * 0.85 },
-            { x: CONFIG.SPIN_BTN_SIZE, y: CONFIG.SPIN_BTN_SIZE, duration: 0.2, ease: "back.out(2)" },
+            { x: btnScale, y: btnScale, duration: 0.2, ease: "back.out(2)" },
         );
         gsap.to(this.uiManager.spinButton, {
-            rotation: "+=" + (Math.PI * 2),
-            duration: 2.0, repeat: -1, ease: "none", overwrite: "auto",
+            rotation: "+=" + (Math.PI * 4),
+            duration: 0.8, repeat: -1, ease: "none", overwrite: "auto",
         });
 
         void isBonusMode; // kept for API symmetry

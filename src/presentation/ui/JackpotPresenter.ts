@@ -1,6 +1,7 @@
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import { gsap } from "gsap";
 import type { ParticleEmitter } from "../vfx/ParticleEmitter";
+import { getAppWidth, getAppHeight } from "../../domain/constants/Config";
 
 export class JackpotPresenter {
     private container: Container;
@@ -93,15 +94,18 @@ export class JackpotPresenter {
         });
     }
 
-    public handleResize() {
+    public handleResize(width?: number, height?: number) {
+        const w = width || getAppWidth();
+        const h = height || getAppHeight();
+        
         this.overlay.clear();
-        this.overlay.rect(0, 0, window.innerWidth, window.innerHeight);
+        this.overlay.rect(0, 0, w, h);
         this.overlay.fill({ color: 0x000000, alpha: 0.75 });
         
-        this.titleText.x = window.innerWidth / 2;
-        this.titleText.y = window.innerHeight / 2 - 100;
+        this.titleText.x = w / 2;
+        this.titleText.y = h / 2 - 100;
         
-        this.amountText.x = window.innerWidth / 2;
-        this.amountText.y = window.innerHeight / 2 + 100;
+        this.amountText.x = w / 2;
+        this.amountText.y = h / 2 + 100;
     }
 }

@@ -50,7 +50,7 @@ The Cascade engine dynamically handles nested win matrices (Avalanche drops) ret
 ### 2. The Free Spins State Machine
 - **State Transition:** 3 or more Scatters (`sc`) landing independently of paylines triggers the Free Spins mode.
 - **Visual Swap:** The `SlotMachine` Composition Root commands the `VFXManager` to draw a Black Hole transition. When the screen clears, all environmental `Starfield` and `WaterBg` modules tint crimson. The UI purges standard buttons via `UIManager`.
-- **Accumulator Context:** The mathematical bet deduction ceases. The `SlotMachine` begins tracking `sessionWins` accumulatively. The `UIManager.totalWinText` is hard-bound to this running total, explicitly bypassing the standard reset tick. 
+- **Accumulator Context:** The mathematical bet deduction ceases. The `SlotMachine` begins tracking `sessionWins` accumulatively. The `UIManager.totalWinText` is hard-bound to this running total, explicitly bypassing the standard reset tick. (Note: Bet adjustment via `BetModal` is disabled during active bonus spins).
 - **Destruction:** Once the `bonusSpins` count hits `0`, a final `TOTAL WIN` execution reveals the aggregate mathematical sum. The state machine unwinds to Base Game aesthetics.
 
 ---
@@ -67,3 +67,4 @@ The `Config.ts` file acts as the ultimate authority for tweaking the **visceral 
 | `PANEL_POPUP_SPEED` | Easing Parameter | Speed at which massive `WinPresenter` SVG overlays elastic-bounce into frame. |
 | `API_BASE_URL` | Infrastructure Coupling | Pointer to the active RNG Microservice. *(Default: `http://localhost:3000`)* |
 | `UI_COLORS` | CSS/Tint Variables | Hardcoded hexadecimal palettes dictating State Machine shifts (e.g., Free Spins red). |
+| `BET_VALUES` | Math Config | Array of allowed bet amounts selectable via the `BetModal` slider. |

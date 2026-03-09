@@ -9,9 +9,9 @@ export class LeftTopUI {
         this.container = new Container();
         this.hatSprite = new Sprite(Assets.get("hat.png"));
         this.hatSprite.anchor.set(0, 0);
-        this.hatSprite.x = CONFIG.HAT_X;
-        this.hatSprite.y = CONFIG.HAT_Y;
-        this.hatSprite.scale.set(CONFIG.HAT_SCALE);
+        this.hatSprite.x = CONFIG.HAT_LANDSCAPE_X;
+        this.hatSprite.y = CONFIG.HAT_LANDSCAPE_Y;
+        this.hatSprite.scale.set(CONFIG.HAT_LANDSCAPE_SCALE);
         this.container.addChild(this.hatSprite);
     }
     public setTheme(isFreeSpins: boolean) {

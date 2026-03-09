@@ -187,7 +187,7 @@ export class ParticleEmitter {
         aura.scale.set(3); // Make it large enough to surround the button
         aura.alpha = 0;
         aura.blendMode = 'add';
-        aura.zIndex = -1; // Keep it behind the button text/graphic if possible
+        aura.zIndex = 5; // Keep it behind the button text/graphic if possible
 
         targetContainer.addChildAt(aura, 0);
 
