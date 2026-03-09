@@ -125,7 +125,7 @@ export const CONFIG = {
 
     // Backend
     USE_BACKEND: true,
-    API_BASE_URL: "http://localhost:3000",
+    API_BASE_URL: "http://blitzgamingbackoffice.test/api/v1",
 };
 
 
