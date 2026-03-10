@@ -67,10 +67,15 @@ export type BackendPlayData = {
   max_win_hit?: boolean;
   jackpot_hit?: boolean;
   jackpot_type?: "mini" | "major" | "grand";
+  /** Debug-only: ask frontend to play Big → Mega → Max in one spin */
+  debug_tier_sequence?: Array<"big" | "mega" | "max">;
+  /** Debug-only: optional per-tier win amounts for showcase */
+  debug_tier_amounts?: Partial<Record<"big" | "mega" | "max", number>>;
 };
 
 export type BackendResponse<T> = { success: boolean; data: T };
 
+/** Default targets slot-free.js backend (run: node slot-free.js → http://localhost:3000). Override via setSlotApiBaseUrl(CONFIG.API_BASE_URL). */
 let apiBaseUrl = "http://localhost:3000";
 
 export function setSlotApiBaseUrl(url: string) {

@@ -32,7 +32,7 @@ export class BuyFreeSpinsModal {
         modal.addChild(panelContainer);
 
         const panel = new Graphics()
-            .roundRect(-350, -220, 700, 440, 24)
+            .roundRect(-420, -320, 840, 640, 24)
             .fill({ color: 0x15110C, alpha: 0.98 })
             .stroke({ color: 0xBA8A4C, width: 4, alpha: 0.9 });
         panel.eventMode = "static";
@@ -40,9 +40,9 @@ export class BuyFreeSpinsModal {
 
         // Header
         const header = new Graphics()
-            .roundRect(-350, -220, 700, 70, 24)
+            .roundRect(-420, -320, 840, 80, 24)
             .fill({ color: 0xBA8A4C, alpha: 0.2 })
-            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.4 });
+            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.5 });
         panelContainer.addChild(header);
 
         const title = new Text({
@@ -56,17 +56,17 @@ export class BuyFreeSpinsModal {
             }),
         });
         title.anchor.set(0.5);
-        title.position.set(0, -185);
+        title.position.set(0, -280);
         title.resolution = 2;
         panelContainer.addChild(title);
 
         // Close Button (X)
         const closeBtn = new Container();
-        const closeBg = new Graphics().circle(0, 0, 22).fill({ color: 0xBA8A4C, alpha: 0.3 }).stroke({ color: 0xBA8A4C, width: 2 });
-        const closeTxt = new Text({ text: "✕", style: { fill: "#FFD700", fontSize: 22, fontWeight: "bold" } });
+        const closeBg = new Graphics().circle(0, 0, 25).fill({ color: 0xBA8A4C, alpha: 0.3 }).stroke({ color: 0xBA8A4C, width: 2 });
+        const closeTxt = new Text({ text: "✕", style: { fill: "#FFD700", fontSize: 24, fontWeight: "bold" } });
         closeTxt.anchor.set(0.5);
         closeBtn.addChild(closeBg, closeTxt);
-        closeBtn.position.set(310, -185);
+        closeBtn.position.set(380, -280);
         closeBtn.eventMode = 'static';
         closeBtn.cursor = 'pointer';
         closeBtn.on('pointerdown', () => this.hide());
@@ -83,7 +83,7 @@ export class BuyFreeSpinsModal {
             }),
         });
         body.anchor.set(0.5);
-        body.position.set(0, 30);
+        body.position.set(0, 40);
         body.resolution = 2;
         panelContainer.addChild(body);
 
@@ -94,14 +94,14 @@ export class BuyFreeSpinsModal {
             btn.cursor = "pointer";
 
             const bg = new Graphics()
-                .roundRect(-165, -48, 330, 96, 18)
+                .roundRect(-165, -40, 330, 80, 14)
                 .fill({ color, alpha: 1 })
                 .stroke({ color: 0xBA8A4C, width: 3, alpha: 0.7 });
             btn.addChild(bg);
 
             const t = new Text({
                 text: label,
-                style: new TextStyle({ fill: 0xffffff, fontSize: 38, fontWeight: "800" }),
+                style: new TextStyle({ fill: 0xffffff, fontSize: 34, fontWeight: "800" }),
             });
             t.anchor.set(0.5);
             t.resolution = 2;
@@ -110,8 +110,8 @@ export class BuyFreeSpinsModal {
             return btn;
         };
 
-        const confirmBtn = makeButton("CONFIRM", -170, 150, 0xF3CB0D);
-        const cancelBtn = makeButton("CANCEL", 170, 150, 0xb00020);
+        const confirmBtn = makeButton("CONFIRM", -170, 220, 0xF3CB0D);
+        const cancelBtn = makeButton("CANCEL", 170, 220, 0xb00020);
 
         confirmBtn.on("pointerdown", () => {
             this.hide();
@@ -149,22 +149,18 @@ export class BuyFreeSpinsModal {
             this.modalContainer.x = width / 2;
             this.modalContainer.y = height / 2;
 
-            // Recenter/Resize overlay if needed (though Graphics usually handle it, 
-            // we ensure it covers the large bounds from origin)
             const overlay = this.modalContainer.children[0] as Graphics;
             if (overlay) {
                 overlay.clear()
-                    .rect(-width, -height, width * 2, height * 2)
+                    .rect(-2000, -2000, 4000, 4000)
                     .fill({ color: 0x000000, alpha: 0.85 });
             }
 
             const panelContainer = this.modalContainer.children[1] as Container;
             if (panelContainer) {
-                const baseScale = isPortrait ? 0.65 : 1.0;
+                const baseScale = isPortrait ? 0.7 : 1.0;
                 panelContainer.scale.set(baseScale);
-                
-                // Further scale down if screen is extremely small
-                const fitScale = Math.min(1, (width * 0.95) / (720 * baseScale)); 
+                const fitScale = Math.min(1, (width * 0.95) / (840 * baseScale));
                 panelContainer.scale.set(baseScale * fitScale);
             }
         }

@@ -1,97 +1,107 @@
-# 🎰 BountyRUSH WebGL Slot Engine
+# BountyRUSH Slot Engine
 
-> **A High-Performance, Domain-Driven Design (DDD) Slot Machine Engine.**
-> Built with PixiJS v7, GSAP, and strict TypeScript. Engineered for 60fps performance and long-term extensibility via SOLID principles.
-
-Welcome to the **BountyRUSH** project. This repository contains the complete frontend engineering for a production-ready WebGL slot machine. 
-
-As the Principal Architect of this system, the core mandate was to establish a codebase that survives changing business requirements. We achieve this by enforcing strict architectural boundaries, decoupling the visual presentation from the mathematical game state, and relying heavily on Dependency Inversion.
+A production-oriented WebGL slot machine built with **PixiJS**, **GSAP**, and **TypeScript**. The codebase follows **Domain-Driven Design (DDD)** and **SOLID** principles: domain logic is independent of rendering, and the presentation layer depends on the domain via clear contracts.
 
 ---
 
-## ✨ System Capabilities
+## Features
 
-- **Physics-Based Reels:** True momentum, blur filters, and GSAP-driven physical bounce-backs.
-- **Avalanche Drop Engine:** A decoupled cascade system supporting multi-stage symbol breaking and chained win evaluations.
-- **Strict Separation of Concerns:** Core domain math and orchestrators have zero knowledge of PixiJS or the HTML DOM.
-- **Enterprise Type Safety:** Complete elimination of `any` types. Data flow from backend JSON to WebGL Sprite is strictly guarded by TypeScript compilation.
-- **O(1) Asset Resolution:** Spritesheet atlasing and pre-loading guarantees zero mid-spin HTTP requests for visual assets.
-
----
-
-## 🛠️ Technology Stack
-
-| Architecture Layer | Technology | Engineering Purpose |
-| :--- | :--- | :--- |
-| **Presentation / WebGL** | [PixiJS v8](https://pixijs.com/) | Hardware-accelerated 2D rendering pipeline |
-| **Animation / Sequencing** | [GSAP](https://greensock.com/gsap/) | Deterministic easing and timeline orchestration |
-| **Domain / Contracts** | [TypeScript](https://www.typescriptlang.org/) | Strict typing (`erasableSyntaxOnly`) bridging I/O boundaries |
-| **Build / Tooling** | [Vite](https://vitejs.dev/) | HMR development server and ES module bundling |
+- **5×3 slot with 243 ways** – Left-to-right evaluation; Wild and Scatter rules.
+- **Cascade (Avalanche) engine** – Multi-stage symbol break and drop with multiplier.
+- **Free Spins & Bonus Buy** – State machine and UI for bonus mode.
+- **Responsive layout** – Separate **landscape** and **portrait** configs for layout and menu.
+- **PixiJS rendering** – Reels, blur, symbols, and HUD; HTML overlay for Paytable menu.
+- **Backend-agnostic** – Slot math can be driven by local simulator or remote API.
 
 ---
 
-## 🏗️ Architectural Vision (Domain-Driven Design)
+## Tech stack
 
-The `src/` directory is strictly divided into four functional layers. **The Golden Rule:** Dependencies must *always* point inward toward the Domain. 
-
-```text
-/src
-├── /domain              ← [Core] Business Rules & Mathematical Models
-│   ├── /models          Type Interfaces (e.g., `GridPosition`, `CascadeStep`)
-│   ├── /entities        Stateful Game Objects (e.g., `Reel`)
-│   └── /constants       Global Constants (e.g., `Config`)
-│
-├── /application         ← [Flow] Orchestration & Use Cases
-│   ├── /orchestrators   Sequence Drivers (e.g., `SpinOrchestrator`, `CascadeOrchestrator`)
-│   └── SlotMachine.ts   The Composition Root (Dependency Injection hub)
-│
-├── /infrastructure      ← [I/O] External System Drivers
-│   ├── /api             Backend HTTP Adapters (`slotApi.ts`)
-│   └── /audio           WebAudio Wrappers (`SoundManager.ts`)
-│
-└── /presentation        ← [UI] PixiJS Rendering & Post-Processing
-    ├── /ui              Menus, HUD, Modals (`UIManager`, `BetModal`, `HelpModal`)
-    ├── /vfx             Particles, Layout Shaders (`VFXManager`)
-    └── /animation       Stateful visual actors (`SymbolAnimator`)
-```
-
-### The SOLID Contract for Contributors:
-1. **Single Responsibility Principle (SRP):** If a class handles DOM clicks, it *cannot* calculate winning paylines.
-2. **Open/Closed Principle (OCP):** New win mechanics (like Cluster Pays) should be implemented by creating a new `WinEvaluator`, not by modifying existing ones `if (mode === 'cluster')`.
-3. **Dependency Inversion (DIP):** Presentation layers rely on abstractions. The `SlotMachine` composition root injects concrete instances (like `ParticleEmitter`) into orchestrators via their constructors.
-- **Components**: `UIManager` routes clicks outward to delegates. `BetModal` handles specialized input logic via a high-zIndex overlay to prevent background interactions during state mutation. `VFXManager` manages global visual state overrides.
+| Layer / concern   | Technology |
+|-------------------|------------|
+| Rendering         | [PixiJS v8](https://pixijs.com/) |
+| Animation         | [GSAP](https://greensock.com/gsap/) |
+| Language / types   | [TypeScript](https://www.typescriptlang.org/) |
+| Build & dev server| [Vite](https://vitejs.dev/) |
+| Audio             | [@pixi/sound](https://pixijs.com/packages/sound) |
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18+ LTS recommended)
-- `npm`
 
-### Bootstrapping the Environment
-1. **Clone & Install:**
-   ```bash
-   git clone https://github.com/your-org/bounty-rush-slot.git
-   cd bounty-rush-slot
-   npm install
-   ```
-2. **Launch the Development Server:**
-   ```bash
-   npm run dev
-   ```
-3. **Run the Math Simulator (Optional):**
-   *(If `USE_BACKEND = true` in `Config.ts`)*
-   ```bash
-   node slot-free.js
-   ```
+- **Node.js** v18+ (LTS recommended)
+- **npm**
 
-### Pre-Commit Checks
-We rely on the TS compiler for CI/CD integrity. Before opening a Pull Request, ensure the codebase satisfies strict typing:
+### Install and run
+
+```bash
+git clone <repository-url>
+cd slot
+npm install
+npm run dev
+```
+
+Open the URL shown in the terminal (e.g. `http://localhost:5173`).
+
+### Optional: local backend
+
+To drive the slot with the sample backend (RNG and payouts):
+
+1. Start the backend, e.g. `node sample-backend.js` (or your backend on the port set in config).
+2. Set `API_BASE_URL` in `src/domain/constants/Config.ts` to that server (default is `http://localhost:3000`).
+
+---
+
+## Scripts
+
+| Command        | Description                    |
+|----------------|--------------------------------|
+| `npm run dev`  | Start Vite dev server (HMR)    |
+| `npm run build`| Type-check (`tsc`) + Vite build|
+| `npm run preview` | Serve production build     |
+
+### Pre-commit / CI
+
+Ensure TypeScript compiles before pushing:
+
 ```bash
 npx tsc --noEmit
 ```
 
 ---
 
-*Engineered with strict discipline. Built for scale.*
+## Project structure (high level)
+
+Dependencies point **inward** toward the domain; presentation and infrastructure depend on application/domain, not the other way around.
+
+```
+src/
+├── domain/          # Core: entities, config, types (no Pixi/DOM)
+├── application/     # Flow: orchestrators, composition root (SlotMachine)
+├── infrastructure/  # I/O: API client, audio
+└── presentation/    # UI: Pixi components, modals, VFX, animation
+```
+
+Configuration is split into **landscape** and **portrait** in `src/domain/constants/Config.ts` (`LANDSCAPE`, `PORTRAIT`) for easy tuning per orientation; `CONFIG` exposes backward-compatible flat keys for the rest of the app.
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [**docs/ARCHITECTURE.md**](docs/ARCHITECTURE.md) | **Architecture reference**: layers, dependency rule, modules, config, data flow. |
+| [**docs/RULES.md**](docs/RULES.md) | **Game rules**: betting, winning mechanics, paytable, free spins, configuration. |
+| [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | Directory layout and layer responsibilities. |
+| [SLOT_MACHINE.md](SLOT_MACHINE.md) | Game mechanics, reels, cascade, and config parameters. |
+| [DEV.md](DEV.md) | Contribution guide and SOLID/DDD practices. |
+
+Start with **docs/ARCHITECTURE.md** for design and boundaries; use the others for deep dives and contribution rules.
+
+---
+
+## License
+
+Private / proprietary. See repository settings or legal notice.

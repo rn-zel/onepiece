@@ -16,12 +16,12 @@ export class SoundManager {
         sfx_totalwin: {url: 'sounds/totalwin.mp3', volume: 10},
         sfx_thunder: {url: 'sounds/thunder.mp3', volume: 3},
 
-        // New requested SFX
-        sfx_break: {url: 'sounds/explode.mp3', volume: 8},
-        sfx_coin: {url: 'sounds/win.mp3', volume: 4}, // Reused for balance accumulation
-        sfx_button: {url: 'sounds/newthemepop.mp3', volume: 7},
-        sfx_buy: {url: 'sounds/vortex.mp3', volume: 10},
-        sfx_bet: {url: 'sounds/newthemepop.mp3', volume: 7},
+      
+        sfx_break: {url: 'sounds/break.mp3', volume: 8},
+        sfx_coin: {url: 'sounds/coin.mp3', volume: 4}, 
+        sfx_button: {url: 'sounds/button.mp3', volume: 7},
+        sfx_buy: {url: 'sounds/buy.mp3', volume: 10},
+        sfx_bet: {url: 'sounds/fah.mp3', volume: 7},
     };
 
     constructor() {

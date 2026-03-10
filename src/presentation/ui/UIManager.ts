@@ -2,8 +2,8 @@ import { Container, Sprite, Text, TextStyle, Assets, Graphics } from "pixi.js";
 import { CONFIG, DEVICE_TYPES, type DeviceType } from "../../domain/constants/Config";
 import { HelpModal } from "./HelpModal";
 import { StatsModal } from "./StatsModal";
-import { BetModal } from "./BetModal";
 import { AutoSpinModal, type AutoSpinConfig } from "./AutoSpinModal";
+import { WinPresenter } from "./WinPresenter";
 
 export class UIManager {
     container = new Container();
@@ -32,20 +32,20 @@ export class UIManager {
     private turboButton!: Container;
     private isTurboActive: boolean = false;
     private statsModal!: StatsModal;
-    private betModal!: BetModal;
     private autoSpinModal!: AutoSpinModal;
 
     private helpModal!: HelpModal;
+    public winPresenter!: WinPresenter;
 
     private onSpin: () => void;
     private onBuyFreeSpins: () => void;
-    private onBetAdjust: (amount: number) => void;
+    private onBetAdjust: (delta: -1 | 1) => void;
     private onAutoSpinStart: (config: AutoSpinConfig) => void;
 
     constructor(
         onSpin: () => void,
         onBuyFreeSpins: () => void,
-        onBetAdjust: (amount: number) => void,
+        onBetAdjust: (delta: -1 | 1) => void,
         onAutoSpinStart: (config: AutoSpinConfig) => void
     ) {
         this.onSpin = onSpin;
@@ -66,9 +66,13 @@ export class UIManager {
 
         this.helpModal = new HelpModal(this.container);
         this.statsModal = new StatsModal(this.container);
-        this.betModal = new BetModal(this.container, (amt) => this.onBetAdjust(amt - CONFIG.BET_AMOUNT)); // We will update onBetAdjust logic or just use a new callback
         this.autoSpinModal = new AutoSpinModal(this.container, (cfg) => this.onAutoSpinStart(cfg));
+        
+        this.winPresenter = new WinPresenter(this);
+        this.winPresenter.init();
     }
+
+    // Removed internal bet calculation logic as it's now handled by the Domain layer (GameState).
 
     private createUI() {
         const glowStyle = new TextStyle({
@@ -121,8 +125,7 @@ export class UIManager {
         this.menuButton.eventMode = "static";
         this.menuButton.cursor = "pointer";
         this.menuButton.on("pointerdown", () => {
-            // If there's an active sound manager passed in, we can play a sound. But UIManager doesn't have it natively.
-            this.helpModal.show();
+            window.dispatchEvent(new CustomEvent("slot-open-menu"));
         });
         this.container.addChild(this.menuButton);
 
@@ -202,7 +205,7 @@ export class UIManager {
         this.betAmountText.on("pointerdown", () => {
             const balance = parseFloat(this.balanceText.text.replace(/[^0-9.]/g, ''));
             const currentBet = parseFloat(this.betAmountText.text.replace(/[^0-9.]/g, ''));
-            this.betModal.show(balance, currentBet);
+            window.dispatchEvent(new CustomEvent("slot-open-bet", { detail: { balance, currentBet } }));
         });
         this.container.addChild(this.betAmountText);
 
@@ -238,7 +241,7 @@ export class UIManager {
         this.minusButton.interactive = true;
         this.minusButton.eventMode = "static";
         this.minusButton.cursor = "pointer";
-        this.minusButton.on("pointerdown", () => this.onBetAdjust(-10));
+        this.minusButton.on("pointerdown", () => this.onBetAdjust(-1));
         this.container.addChild(this.minusButton);
 
         // PLUS BUTTON 
@@ -250,7 +253,7 @@ export class UIManager {
         this.plusButton.interactive = true;
         this.plusButton.eventMode = "static";
         this.plusButton.cursor = "pointer";
-        this.plusButton.on("pointerdown", () => this.onBetAdjust(10));
+        this.plusButton.on("pointerdown", () => this.onBetAdjust(1));
         this.container.addChild(this.plusButton);
 
         // WIN TEX
@@ -360,7 +363,6 @@ export class UIManager {
     }
 
     public handleResize(width: number, height: number) {
-        this.betModal?.handleResize(width, height);
         this.autoSpinModal?.handleResize(width, height);
         this.statsModal?.handleResize(width, height);
         this.helpModal?.handleResize(width, height);

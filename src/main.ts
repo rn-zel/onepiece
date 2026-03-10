@@ -1,7 +1,7 @@
 // src/main.ts
 import { Application, Assets, Texture } from "pixi.js";
 import { SlotMachine } from "./SlotMachine";
-import { ASSETS } from "./domain/constants/Config";
+import { ASSETS, LANDSCAPE, PORTRAIT, GAME_RULES, CONFIG } from "./domain/constants/Config";
 import { Starfield } from './presentation/animation/Starfield'; 
 import { SymbolAnimator } from "./presentation/animation/SymbolAnimator"
 import { WaterBg } from "./presentation/animation/WaterBg";
@@ -39,7 +39,10 @@ import { WaterBg } from "./presentation/animation/WaterBg";
     const bgTexture = Texture.from("border.png"); 
     
     (window as any).slotMachine = new SlotMachine(app, slotTextures, bgTexture, starBackground, animator, waterBg);
-    
+    (window as any).slotMenuConfig = { landscape: LANDSCAPE.MENU, portrait: PORTRAIT.MENU };
+    (window as any).slotRulesConfig = GAME_RULES;
+    (window as any).slotApiBaseUrl = CONFIG.API_BASE_URL;
+
   } catch (error) { 
       console.error("Error starting game:", error); 
   }

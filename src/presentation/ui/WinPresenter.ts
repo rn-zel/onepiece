@@ -1,28 +1,31 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, TextStyle } from "pixi.js";
 import gsap from "gsap";
 import { CONFIG } from "../../domain/constants/Config";
 import type { UIManager } from "./UIManager";
 
 /**
- * Owns all win-display UI: the win panel, the bonus panel, and their animations.
- * Extracted from SlotMachine to enforce the Single Responsibility Principle.
+ * Presentation Layer: Manages win display UI.
  */
 export class WinPresenter {
     private winPanel!: Container;
     private bonusPanel!: Container;
+    private tierPanel!: Container;
+    private tierGlowBg!: Graphics;
     private uiManager: UIManager;
+
+    private _currentTierValue: number = 0;
+    private _tierTween: gsap.core.Tween | null = null;
+    private _activeTierLabel: string = "";
 
     constructor(uiManager: UIManager) {
         this.uiManager = uiManager;
     }
 
-    /** Must be called once after UIManager.winText has been added to a parent container. */
     init(): void {
         this._createWinPanel();
         this._createBonusPanel();
+        this._createTierPanel();
     }
-
-    // ── Public API ───────────────────────────────────────────────────
 
     showWin(delay: number = 0): void {
         if (!this.winPanel) return;
@@ -73,6 +76,12 @@ export class WinPresenter {
         const panels: Container[] = [];
         if (this.winPanel) panels.push(this.winPanel);
         if (this.bonusPanel) panels.push(this.bonusPanel);
+        if (this.tierPanel) panels.push(this.tierPanel);
+
+        if (this._tierTween) {
+            this._tierTween.kill();
+            this._tierTween = null;
+        }
 
         for (const panel of panels) {
             gsap.killTweensOf(panel);
@@ -84,13 +93,162 @@ export class WinPresenter {
         }
     }
 
-    // ── Private Helpers ──────────────────────────────────────────────
+    /**
+     * trigger a heavy text celebration before resuming the count.
+     */
+    async showTierWin(totalWin: number, betAmount: number): Promise<void> {
+        if (!this.tierPanel) return;
+
+        const isVisible = this.tierPanel.visible && this.tierPanel.alpha > 0.5;
+
+        if (this.winPanel) this.winPanel.visible = false;
+        if (this.bonusPanel) this.bonusPanel.visible = false;
+
+        this._adoptText(this.tierPanel);
+        this.tierPanel.visible = true;
+
+        if (!isVisible) {
+            this._currentTierValue = 0;
+            this.tierPanel.alpha = 0;
+            this.tierPanel.scale.set(0.9);
+            
+            this._setTierVisuals("big", 0);
+
+            gsap.killTweensOf(this.tierPanel);
+            gsap.killTweensOf(this.tierPanel.scale);
+            gsap.to(this.tierPanel, { alpha: 1, duration: 0.3, ease: "power2.out" });
+            gsap.to(this.tierPanel.scale, { x: 1, y: 1, duration: 0.4, ease: "back.out(1.6)" });
+        }
+
+        if (this._tierTween) this._tierTween.kill();
+
+        const megaMult = (CONFIG as any).MEGA_WIN_MULTIPLIER ?? 50;
+        const maxMult = (CONFIG as any).MAX_WIN_MULTIPLIER ?? 100;
+
+        const megaThreshold = betAmount * megaMult;
+        const maxThreshold = betAmount * maxMult;
+
+        //  Plot the milestones the counter needs to hit
+        const sequence: { tier: "mega" | "max" | "done", value: number }[] = [];
+
+        if (totalWin >= megaThreshold && this._currentTierValue < megaThreshold) {
+            sequence.push({ tier: "mega", value: megaThreshold });
+        }
+        if (totalWin >= maxThreshold && this._currentTierValue < maxThreshold) {
+            sequence.push({ tier: "max", value: maxThreshold });
+        }
+        
+        sequence.push({ tier: "done", value: totalWin });
+
+        //  Iterate through each milestone chunk
+        for (const step of sequence) {
+            const targetVal = step.value;
+            
+            if (targetVal > this._currentTierValue) {
+                const distance = (targetVal - this._currentTierValue) / betAmount;
+                let duration = (distance / 50) * 4.0; 
+                duration = Math.max(1.5, Math.min(duration, 5.0)); 
+
+                await new Promise<void>((resolve) => {
+                    const counterObj = { val: this._currentTierValue };
+                    this._tierTween = gsap.to(counterObj, {
+                        val: targetVal,
+                        duration: duration,
+                        ease: "power2.out", 
+                        onUpdate: () => {
+                            this._currentTierValue = Math.floor(counterObj.val);
+                            this.uiManager.winText.text = `${this._activeTierLabel}\n₱${this._currentTierValue.toLocaleString()}`;
+                        },
+                        onComplete: resolve
+                    });
+                });
+            }
+
+            // If we hit a threshold, pause the counter and celebrate!
+            if (step.tier === "mega" || step.tier === "max") {
+                this._setTierVisuals(step.tier, targetVal);
+                
+                // Halt the system for  seconds s
+                await new Promise<void>((resolve) => gsap.delayedCall(1.5, resolve));
+            }
+        }
+
+        // Lock in the final exact text value
+        this.uiManager.winText.text = `${this._activeTierLabel}\n₱${Math.floor(totalWin).toLocaleString()}`;
+
+        // Wait  end before hiding
+        await new Promise<void>((resolve) => gsap.delayedCall(2.5, resolve));
+        this.hide();
+    }
+
+    // ── Private Helpers 
+
+ 
+    private _setTierVisuals(tier: "big" | "mega" | "max", currentValue: number): void {
+        const newLabel = tier === "max" ? "MAX WIN" 
+                       : tier === "mega" ? "MEGA WIN" 
+                       : "BIG WIN";
+
+        this._activeTierLabel = newLabel;
+        this._applyTierWinTextStyle(tier);
+        
+        const glowColor = (CONFIG as any).TIER_BG_GLOW?.[tier] ?? 0xffc107;
+        this._drawTierGlow(glowColor);
+
+        // Heavy, lingering elastic bounce
+        gsap.killTweensOf(this.uiManager.winText.scale);
+        gsap.fromTo(this.uiManager.winText.scale, 
+            { x: 1.6, y: 1.6 }, 
+            { x: 1, y: 1, duration: 1.5, ease: "elastic.out(1, 0.3)" }
+        );
+
+        this.uiManager.winText.text = `${this._activeTierLabel}\n₱${currentValue.toLocaleString()}`;
+    }
 
     private _adoptText(panel: Container): void {
         if (this.uiManager.winText.parent !== panel) {
             this.uiManager.winText.parent?.removeChild(this.uiManager.winText);
             this.uiManager.winText.position.set(0, 0);
             panel.addChild(this.uiManager.winText);
+        }
+    }
+
+    private _applyTierWinTextStyle(tier: "big" | "mega" | "max" = "big"): void {
+        const fillColors = (CONFIG as any).TIER_TEXT_FILL?.[tier] 
+            ? [(CONFIG as any).TIER_TEXT_FILL[tier], 0xffffff, (CONFIG as any).TIER_TEXT_FILL[tier]]
+            : [0xffffff, 0xfbff00, 0xffc800];
+
+        const style = new TextStyle({
+            fontFamily: "Georgia, serif",
+            fontSize: 300,
+            fontWeight: "900",
+            align: "center",
+            letterSpacing: 5,
+            padding: 20, 
+            fill: fillColors, 
+            stroke: { color: 0x000000, width: 12, join: "round" },
+            dropShadow: {
+                color: 0x000000,
+                blur: 4,
+                distance: 8,
+                angle: Math.PI / 4,
+                alpha: 0.8,
+            },
+        });
+        this.uiManager.winText.style = style;
+    }
+
+    private _drawTierGlow(color: number): void {
+        if (!this.tierGlowBg) return;
+        this.tierGlowBg.clear();
+
+        const cx = 0, cy = 80;
+        const radii = [1600, 1200, 900, 600, 400];
+        const alphas = [0.05, 0.12, 0.22, 0.35, 0.5];
+
+        for (let i = 0; i < radii.length; i++) {
+            this.tierGlowBg.circle(cx, cy, radii[i]);
+            this.tierGlowBg.fill({ color, alpha: alphas[i] });
         }
     }
 
@@ -148,5 +306,21 @@ export class WinPresenter {
         );
 
         parent.addChild(this.bonusPanel);
+    }
+
+    private _createTierPanel(): void {
+        if (!this.winPanel) return;
+        const parent = this.uiManager.container;
+
+        this.tierPanel = new Container();
+        this.tierPanel.zIndex = 170;
+        this.tierPanel.position.copyFrom(this.winPanel.position);
+        this.tierPanel.visible = false;
+        this.tierPanel.alpha = 0;
+
+        this.tierGlowBg = new Graphics();
+        this.tierPanel.addChild(this.tierGlowBg);
+
+        parent.addChild(this.tierPanel);
     }
 }

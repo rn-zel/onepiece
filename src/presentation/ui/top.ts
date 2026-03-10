@@ -1,5 +1,5 @@
 import { Container, Sprite, Assets, Text } from "pixi.js";
-import { CONFIG } from "../../domain/constants/Config";
+import { CONFIG, GAME_RULES } from "../../domain/constants/Config";
 
 export class TopUI {
     private container: Container;
@@ -95,12 +95,15 @@ export class TopUI {
         return text;
     }
 
-    public updateJackpots(betAmount: number) {
-        // Example base multipliers for jackpots: 
-        // Mini (10x), Major (50x), Grand (1000x)
-        this.miniText.text = `₱${Math.floor(betAmount * 10).toLocaleString()}`;
-        this.majorText.text = `₱${Math.floor(betAmount * 50).toLocaleString()}`;
-        this.grandText.text = `₱${Math.floor(betAmount * 1000).toLocaleString()}`;
+    public updateJackpots(prizes?: { mini: number; major: number; grand: number }) {
+        const p = prizes ?? {
+            mini: GAME_RULES.JACKPOT_MINI,
+            major: GAME_RULES.JACKPOT_MAJOR,
+            grand: GAME_RULES.JACKPOT_GRAND,
+        };
+        this.miniText.text = `₱${p.mini.toLocaleString()}`;
+        this.majorText.text = `₱${p.major.toLocaleString()}`;
+        this.grandText.text = `₱${p.grand.toLocaleString()}`;
     }
 
     public setTheme(isFreeSpins: boolean) {

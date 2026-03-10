@@ -29,29 +29,29 @@ export class AutoSpinModal {
         this.container.addChild(this.content);
 
         const bg = new Graphics()
-            .roundRect(-300, -250, 600, 500, 24)
+            .roundRect(-420, -320, 840, 640, 24)
             .fill({ color: 0x15110C, alpha: 0.98 })
             .stroke({ color: 0xBA8A4C, width: 4, alpha: 0.9 });
         this.content.addChild(bg);
 
         // Header Bar
         const header = new Graphics()
-            .roundRect(-300, -250, 600, 70, 24)
+            .roundRect(-420, -320, 840, 80, 24)
             .fill({ color: 0xBA8A4C, alpha: 0.2 })
-            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.4 });
+            .stroke({ color: 0xBA8A4C, width: 2, alpha: 0.5 });
         this.content.addChild(header);
 
         const title = new Text({ 
             text: "AUTO SPIN", 
             style: { 
                 fill: "#FFD700", 
-                fontSize: 34, 
+                fontSize: 42, 
                 fontWeight: "900",
                 dropShadow: { color: 0x000000, blur: 4, distance: 2, angle: 0, alpha: 1 }
             } 
         });
         title.anchor.set(0.5);
-        title.y = -215;
+        title.y = -280;
         this.content.addChild(title);
 
         // Close Button (X)
@@ -60,7 +60,7 @@ export class AutoSpinModal {
         const closeTxt = new Text({ text: "✕", style: { fill: "#FFD700", fontSize: 24, fontWeight: "bold" } });
         closeTxt.anchor.set(0.5);
         closeBtn.addChild(closeBg, closeTxt);
-        closeBtn.position.set(260, -215);
+        closeBtn.position.set(380, -280);
         closeBtn.eventMode = 'static';
         closeBtn.cursor = 'pointer';
         closeBtn.on('pointerdown', () => this.hide());
@@ -68,14 +68,14 @@ export class AutoSpinModal {
 
         const counts = [10, 25, 50, 100];
         counts.forEach((count, i) => {
-            const btn = this.createButton(`${count} SPINS`, -120 + (i * 70), () => {
+            const btn = this.createButton(`${count} SPINS`, -140 + (i * 75), () => {
                 this.onStart({ count, stopOnWin: true, stopOnLossLimit: 5000 });
                 this.hide();
             });
             this.content.addChild(btn);
         });
 
-        const cancelBtn = this.createButton("CANCEL", 180, () => this.hide(), 0xb00020);
+        const cancelBtn = this.createButton("CANCEL", 220, () => this.hide(), 0xb00020);
         this.content.addChild(cancelBtn);
 
         this.content.x = 0;
@@ -115,20 +115,20 @@ export class AutoSpinModal {
 
     public handleResize(width: number, height: number) {
         const isPortrait = height > width;
-        this.container.x = width / 2;
-        this.container.y = height / 2;
+        const parent = this.container.parent as Container | null;
+        if (parent) {
+            const localCenter = parent.toLocal({ x: width / 2, y: height / 2 } as any);
+            this.container.position.set(localCenter.x, localCenter.y);
+        }
 
         this.overlay.clear();
-        this.overlay.rect(-width, -height, width * 2, height * 2);
+        this.overlay.rect(-2000, -2000, 4000, 4000);
         this.overlay.fill({ color: 0x000000, alpha: 0.85 });
         
-        // Adjust content scale for portrait
         if (this.content) {
-            const baseScale = isPortrait ? 0.75 : 1.0;
+            const baseScale = isPortrait ? 0.7 : 1.0;
             this.content.scale.set(baseScale);
-            
-            // Further scale down if screen is too small
-            const fitScale = Math.min(1, (width * 0.95) / (600 * baseScale));
+            const fitScale = Math.min(1, (width * 0.95) / (840 * baseScale));
             this.content.scale.set(baseScale * fitScale);
         }
 
