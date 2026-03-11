@@ -337,7 +337,7 @@ export class CascadeOrchestrator {
         if (newRow >= 0 && newRow < 3) {
           tweens.push(
             gsap.to(sprite, {
-              y: newRow * symbolHeight,
+              y: newRow * symbolHeight + reel.symbolSize / 2,
               duration: CONFIG.SYMBOL_DROP_SPEED,
               ease: "power2.out",
             }),
@@ -352,10 +352,10 @@ export class CascadeOrchestrator {
         const symbolIndex = afterGrid[reelIndex][newRow];
         reel.setSpriteToSymbolIndex(sprite, symbolIndex);
         sprite.tint = 0xffffff;
-        sprite.y = -symbolHeight * (newRowsCount - newRow);
+        sprite.y = -symbolHeight * (newRowsCount - newRow) + reel.symbolSize / 2;
         tweens.push(
           gsap.to(sprite, {
-            y: newRow * symbolHeight,
+            y: newRow * symbolHeight + reel.symbolSize / 2,
             duration: CONFIG.SYMBOL_DROP_SPEED + 0.06,
             ease: "power2.out",
           }),

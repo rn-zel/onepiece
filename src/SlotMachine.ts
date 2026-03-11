@@ -662,7 +662,8 @@ export class SlotMachine {
     const totalWidth =
       cardWidth * CONFIG.REELS_COUNT + cardSpacing * (CONFIG.REELS_COUNT - 1);
     this.reelContainer.pivot.x = totalWidth / 2;
-    this.reelContainer.pivot.y = cardHeight / 2.2;
+    // Centering based on 3 symbols + 2 gaps
+    this.reelContainer.pivot.y = (symbolSize * 3 + symbolSpacing * 2) / 2;
 
     if (this.reelContainer.mask instanceof Graphics) {
       this.reelContainer.mask

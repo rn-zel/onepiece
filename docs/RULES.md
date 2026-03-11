@@ -1,20 +1,20 @@
 # Game Rules
 
-This document describes the **Bounty Rush** (Dragon God) slot game rules. The single source of truth for numeric values is `src/domain/constants/Config.ts` (`GAME_RULES`) and the backend `slot-free.js`.
+This document describes the **Bounty Rush** (Dragon God) slot game rules. The single source of truth for numeric values is `src/domain/constants/Config.ts` (`GAME_RULES`) and the Laravel backend.
 
 ---
 
 ## Game overview
 
-| Parameter      | Value   |
-|----------------|---------|
-| **Game name**  | Bounty Rush |
-| **Reel layout**| 5×3 (5 reels, 3 rows) |
-| **Ways to win**| 243 |
-| **Max win cap**| 1000× total bet |
-| **RTP**        | 96.5% |
-| **Volatility** | 5 (high) |
-| **Base bet multiplier** | 30 |
+| Parameter               | Value                 |
+| ----------------------- | --------------------- |
+| **Game name**           | Bounty Rush           |
+| **Reel layout**         | 5×3 (5 reels, 3 rows) |
+| **Ways to win**         | 243                   |
+| **Max win cap**         | 1000× total bet       |
+| **RTP**                 | 96.5%                 |
+| **Volatility**          | 5 (high)              |
+| **Base bet multiplier** | 30                    |
 
 ---
 
@@ -27,7 +27,7 @@ This document describes the **Bounty Rush** (Dragon God) slot game rules. The si
 ### Available bet levels
 
 | Level |
-|-------|
+| ----- |
 | 1     |
 
 ### Available bet sizes
@@ -104,13 +104,13 @@ Total win per spin is capped at **1000× total bet**.
 
 ## Jackpot prizes
 
-| Jackpot | Prize (default) |
-|---------|-----------------|
-| **Mini** | 1,000 |
-| **Major** | 50,000 |
-| **Grand** | 200,000 |
+| Jackpot   | Prize (default) |
+| --------- | --------------- |
+| **Mini**  | 1,000           |
+| **Major** | 50,000          |
+| **Grand** | 200,000         |
 
-Configured in `GAME_RULES` (Config.ts) and `slot-free.js` (`CFG_JACKPOT_*`). Displayed in the top HUD and returned by `/load` and `/play`.
+Configured in `GAME_RULES` (Config.ts) and the Laravel backend. Displayed in the top HUD and returned by `/load` and `/play`.
 
 ---
 
@@ -127,7 +127,7 @@ Configured in `GAME_RULES` (Config.ts) and `slot-free.js` (`CFG_JACKPOT_*`). Dis
 Symbol payouts (3×, 4×, 5×) are defined in:
 
 - Frontend: `src/presentation/ui/HelpModal.ts`, `index.html` (menu overlay)
-- Backend: `slot-free.js` (`SYMBOL_PAYOUTS`)
+- Backend: Laravel `SlotEngine` service (`SYMBOL_PAYOUTS`)
 
 See the in-game **Paytable** (menu) or **Help** modal for current values.
 
@@ -135,14 +135,14 @@ See the in-game **Paytable** (menu) or **Help** modal for current values.
 
 ## Configuration
 
-| Config key | Location | Description |
-|------------|----------|-------------|
-| `GAME_RULES` | `Config.ts` | Game name, reel layout, ways, max win, RTP, volatility, bet levels, bet sizes, jackpot prizes |
-| `GAME_RULES.JACKPOT_MINI/MAJOR/GRAND` | `Config.ts` | Mini, Major, Grand jackpot prize amounts |
-| `BUY_COST_MULTIPLIER` | `Config.ts` | Cost to buy free spins (× bet) |
-| `CFG_JACKPOT_MINI/MAJOR/GRAND` | `slot-free.js` | Jackpot prize amounts (must match Config) |
-| `CFG_SPINS_ON_SCATTER` | `slot-free.js` | Free spins granted on 3+ scatters |
-| `CFG_SPINS_ON_BUY` | `slot-free.js` | Free spins granted on bonus buy |
-| `CFG_SCATTER_TRIGGER` | `slot-free.js` | Minimum scatters to trigger free spins (3) |
+| Config key                            | Location        | Description                                                                                   |
+| ------------------------------------- | --------------- | --------------------------------------------------------------------------------------------- |
+| `GAME_RULES`                          | `Config.ts`     | Game name, reel layout, ways, max win, RTP, volatility, bet levels, bet sizes, jackpot prizes |
+| `GAME_RULES.JACKPOT_MINI/MAJOR/GRAND` | `Config.ts`     | Mini, Major, Grand jackpot prize amounts                                                      |
+| `BUY_COST_MULTIPLIER`                 | `Config.ts`     | Cost to buy free spins (× bet)                                                                |
+| `Jackpots`                            | Laravel Backend | Jackpot prize amounts (must match Config)                                                     |
+| `Spins on Scatter`                    | Laravel Backend | Free spins granted on 3+ scatters                                                             |
+| `Spins on Buy`                        | Laravel Backend | Free spins granted on bonus buy                                                               |
+| `Scatter Trigger`                     | Laravel Backend | Minimum scatters to trigger free spins (3)                                                    |
 
 Frontend and backend must stay in sync for bet sizes, paytable, and free-spin parameters.

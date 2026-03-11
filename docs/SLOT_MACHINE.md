@@ -68,16 +68,16 @@ All **probabilities**, **payouts**, and **feature logic** are determined by the 
 
 Layout and timing are centralized in `src/domain/constants/Config.ts`. Orientation-specific values live in `LANDSCAPE` and `PORTRAIT`; the rest are shared or exposed via flat `CONFIG` keys.
 
-| Parameter / area | Description |
-|------------------|-------------|
-| `REEL_SPIN_DURATION` | Base spin duration before reels reach the result. |
-| `REEL_STAGGER_DELAY` | Delay between reels (e.g. left-to-right). |
-| `SYMBOL_DROP_SPEED` | Duration of drop animation during cascade. |
-| `NORMAL_WIN_DELAY` | Pause after a win before returning to idle. |
-| `PANEL_POPUP_SPEED` | Speed of win/panel pop-in animation. |
-| `API_BASE_URL` | Backend base URL (e.g. `http://localhost:3000`). |
-| `BET_VALUES` | Allowed bet amounts (e.g. for BetModal slider). |
-| `UI_COLORS` | Tints and theme (e.g. free-spins mode). |
-| `LANDSCAPE` / `PORTRAIT` | Full layout and menu config per orientation. |
+| Parameter / area         | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `REEL_SPIN_DURATION`     | Base spin duration before reels reach the result.  |
+| `REEL_STAGGER_DELAY`     | Delay between reels (e.g. left-to-right).          |
+| `SYMBOL_DROP_SPEED`      | Duration of drop animation during cascade.         |
+| `NORMAL_WIN_DELAY`       | Pause after a win before returning to idle.        |
+| `PANEL_POPUP_SPEED`      | Speed of win/panel pop-in animation.               |
+| `API_BASE_URL`           | Backend base URL (e.g. `http://backend.test/api`). |
+| `BET_VALUES`             | Allowed bet amounts (e.g. for BetModal slider).    |
+| `UI_COLORS`              | Tints and theme (e.g. free-spins mode).            |
+| `LANDSCAPE` / `PORTRAIT` | Full layout and menu config per orientation.       |
 
 For the full list and structure, see `Config.ts` and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (configuration strategy).

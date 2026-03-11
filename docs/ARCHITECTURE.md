@@ -149,7 +149,7 @@ Presentation (and the HTML menu) reads from `CONFIG` or, for the overlay, from `
 
 1. **User** – Clicks spin (Presentation: `UIManager`).
 2. **Application** – `SlotMachine.startSpin()` validates (e.g. balance ≥ bet) and calls infrastructure for outcome.
-3. **Infrastructure** – `slotApi` requests backend (or local simulator); returns outcome in domain shape.
+3. **Infrastructure** – `slotApi` requests the Laravel backend (via Herd); returns outcome in domain shape.
 4. **Application** – `SpinOrchestrator` runs the spin timeline; when backend is ready, it drives reels to the result.
 5. **Presentation** – Reels, blur, and HUD update from orchestrator and domain state.
 6. **Application** – If there are wins, `CascadeOrchestrator` runs cascade steps; it calls Presentation (e.g. VFX, WinPresenter) and Infrastructure (e.g. sound).

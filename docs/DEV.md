@@ -8,12 +8,12 @@ This guide defines how to contribute to the BountyRUSH Slot Engine: where code b
 
 Before writing code, decide the **layer** and **bounded context**. Dependencies must point inward (domain has no dependencies on other layers).
 
-| Layer | Path | Allowed | Not allowed |
-|-------|------|---------|-------------|
-| **Domain** | `src/domain/` | Types, entities, config, pure rules | PixiJS, DOM, `window`, network, audio |
-| **Application** | `src/application/` | Orchestration, composition root, flow control | Drawing, low-level rendering, RNG/payout math |
-| **Infrastructure** | `src/infrastructure/` | HTTP client, audio, file I/O | Game rules, UI components |
-| **Presentation** | `src/presentation/` | PixiJS stage, UI, modals, VFX, animation | Win evaluation, balance mutation, API calls |
+| Layer              | Path                  | Allowed                                       | Not allowed                                   |
+| ------------------ | --------------------- | --------------------------------------------- | --------------------------------------------- |
+| **Domain**         | `src/domain/`         | Types, entities, config, pure rules           | PixiJS, DOM, `window`, network, audio         |
+| **Application**    | `src/application/`    | Orchestration, composition root, flow control | Drawing, low-level rendering, RNG/payout math |
+| **Infrastructure** | `src/infrastructure/` | HTTP client, audio, file I/O                  | Game rules, UI components                     |
+| **Presentation**   | `src/presentation/`   | PixiJS stage, UI, modals, VFX, animation      | Win evaluation, balance mutation, API calls   |
 
 **Examples:** `Reel`, `Config`, `GameTypes` → Domain. `SpinOrchestrator`, `CascadeOrchestrator`, `SlotMachine` → Application. `slotApi`, `SoundManager` → Infrastructure. `UIManager`, `BetModal`, `VFXManager`, `SymbolAnimator` → Presentation.
 
@@ -64,10 +64,10 @@ This keeps tuning in one place and preserves a single source of truth for layout
 The frontend is backend-agnostic as long as the **integration contract** is satisfied.
 
 1. **Contract:** The API client and domain types define the expected request/response shape. See `src/infrastructure/api/slotApi.ts` and `src/domain/models/GameTypes.ts` (or equivalent DTOs).
-2. **Config:** Set `API_BASE_URL` in `Config.ts` to your production RNG/backend URL (e.g. `https://api.example.com`).
+2. **Config:** Set `API_BASE_URL` in `Config.ts` to your production RNG/backend URL (e.g. `http://backend.test/api`).
 3. **No frontend payout math:** Probabilities and win calculation stay on the server. The client consumes results and renders them.
 
-The sample backend is `sample-backend.js` (or your own server). The frontend only needs the correct base URL and a backend that matches the contract.
+The Laravel backend provides the RNG and payout logic. The frontend only needs the correct base URL (e.g. `http://backend.test/api`) and a backend that matches the integration contract.
 
 ---
 

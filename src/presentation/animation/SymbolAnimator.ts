@@ -108,7 +108,7 @@ export class SymbolAnimator implements SymbolAnimation {
     const animScale = (renderedHeight / innerHeight) * 1.1;
 
     winContainer.x = staticSprite.x;
-    winContainer.y = staticSprite.y + renderedHeight * 0.5;
+    winContainer.y = staticSprite.y;
     winContainer.zIndex = 100;
 
     const animatedSymbol = new AnimatedSprite(textures);

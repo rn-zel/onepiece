@@ -123,8 +123,8 @@ export class Reel {
       const texture = this.randomTexture();
       const symbol = new Sprite(texture);
 
-      const yPosition = (j - 1) * (this.symbolSize + this.symbolSpacing);
-      symbol.y = yPosition;
+      const symbolHeight = this.symbolSize + this.symbolSpacing;
+      symbol.y = (j - 1) * symbolHeight + this.symbolSize / 2;
 
       const availableWidth = this.cardWidth - this.symbolMargin * 2;
       const scale = Math.min(
@@ -133,7 +133,7 @@ export class Reel {
       );
 
       symbol.scale.set(scale);
-      symbol.anchor.set(0.5, 0);
+      symbol.anchor.set(0.5, 0.5);
       symbol.x = this.cardWidth / 2;
 
       (symbol as unknown as SymbolSprite).baseScale = scale;
@@ -150,7 +150,7 @@ export class Reel {
 
     this.symbols.forEach((s, j) => {
       const relativePos = (((this.position + j) % max) + max) % max;
-      s.y = (relativePos - 1) * symbolHeight; // Remove Math.round to prevent jitter/snapping
+      s.y = (relativePos - 1) * symbolHeight + this.symbolSize / 2;
 
       const currentLap = Math.floor((this.position + j) / max);
 
@@ -190,7 +190,7 @@ export class Reel {
 
     for (let row = 0; row < 3; row++) {
       const bestSprite = sortedSymbols[row + 1];
-      const targetY = row * symbolHeight;
+      const targetY = row * symbolHeight + this.symbolSize / 2;
 
       bestSprite.y = targetY;
       this.setSpriteToSymbolIndex(bestSprite, indices[row]);
