@@ -1,37 +1,28 @@
 // 📁 src/animation/WaterBg.ts
 import { Sprite, Assets } from "pixi.js";
-import bgImagePath from '../../assets/321.png'; 
+import bgImagePath from "../../assets/321.png";
 
 export class WaterBg {
-    public sprite!: Sprite;
-    public isLoaded: boolean = false;
+  public sprite!: Sprite;
+  public isLoaded: boolean = false;
 
-    public async init() {
-        try {
-            const texture = await Assets.load(bgImagePath);
-            this.sprite = new Sprite(texture);
-            this.sprite.anchor.set(0.5);
-            
-            this.sprite.tint = 0xFFFFFF; 
-            
-            this.isLoaded = true;
-            console.log("✅ Background Initialized!");
-
-        } catch (error) {
-            console.error("❌ Failed to load ", error);
-        }
+  public async init() {
+    try {
+      const texture = await Assets.load(bgImagePath);
+      this.sprite = new Sprite(texture);
+      this.sprite.anchor.set(0.5);
+      this.isLoaded = true;
+    } catch (error) {
+      console.error("WaterBg Init Error:", error);
     }
+  }
 
-   public setTheme(isFreeSpins: boolean) {
-        if (!this.isLoaded || !this.sprite) return;
-        
-      
-        console.log("running?", isFreeSpins);
-        
-         
-        this.sprite.tint = isFreeSpins ? 0xaf3f3b : 0xFFFFFF;
-    }
+  public setTheme(isFreeSpins: boolean) {
+    if (!this.isLoaded || !this.sprite) return;
 
-    public play() {}
-    public stop() {}
+    this.sprite.tint = isFreeSpins ? 0xaf3f3b : 0xffffff;
+  }
+
+  public play() {}
+  public stop() {}
 }

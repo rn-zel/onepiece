@@ -1,10 +1,27 @@
-
 const SYMBOL_NAME_TO_INDEX: Record<string, number> = {
-  a: 0, k: 1, q: 2, j: 3,
-  s1: 4, s2: 5, s3: 6, s4: 7,
-  wild: 8, sc: 9,
+  a: 0,
+  k: 1,
+  q: 2,
+  j: 3,
+  s1: 4,
+  s2: 5,
+  s3: 6,
+  s4: 7,
+  wild: 8,
+  sc: 9,
 };
-const INDEX_TO_SYMBOL = ["a", "k", "q", "j", "s1", "s2", "s3", "s4", "wild", "sc"] as const;
+const INDEX_TO_SYMBOL = [
+  "a",
+  "k",
+  "q",
+  "j",
+  "s1",
+  "s2",
+  "s3",
+  "s4",
+  "wild",
+  "sc",
+] as const;
 
 export function symbolNameToIndex(name: string): number {
   const n = String(name).toLowerCase();
@@ -52,7 +69,10 @@ export type BackendFreeSpin = {
 export type BackendLoadData = {
   player: { balance: number; currency?: string };
   jackpot_prizes?: Record<string, unknown> | null;
-  free_spin?: { count: number } | null;
+  free_spin?: {
+    count: number;
+    total_win?: number;
+  } | null;
 };
 
 export type BackendPlayData = {
@@ -61,6 +81,7 @@ export type BackendPlayData = {
   balance: number;
   bet_size?: number;
   bet_level?: number;
+  is_free_spin?: boolean;
   free_spin?: BackendFreeSpin | null;
   slot: BackendSlot;
   jackpot_prizes?: Record<string, number> | null;
@@ -106,25 +127,38 @@ export async function load(): Promise<BackendLoadData> {
 
 /** POST /play – main game spin. Send bet so backend can use it (slot-free.js uses global totalBet; real backend should use body.bet). */
 export async function play(bet: number): Promise<BackendPlayData> {
-  const out = await fetchApi<BackendResponse<BackendPlayData>>("/play", { bet });
+  const out = await fetchApi<BackendResponse<BackendPlayData>>("/play", {
+    bet,
+  });
   return out.data;
 }
 
 /** POST /play-free-game – one free spin. Sends bet so backend can compute payouts. */
-export async function playFreeGame(bet: number = 100): Promise<BackendPlayData> {
-  const out = await fetchApi<BackendResponse<BackendPlayData>>("/play-free-game", { bet });
+export async function playFreeGame(
+  bet: number = 100,
+): Promise<BackendPlayData> {
+  const out = await fetchApi<BackendResponse<BackendPlayData>>(
+    "/play-free-game",
+    { bet },
+  );
   return out.data;
 }
 
 /** POST /buy-free-game – buy free spins (cost = bet * 10 in sample). */
 export async function buyFreeGame(bet: number): Promise<BackendPlayData> {
-  const out = await fetchApi<BackendResponse<BackendPlayData>>("/buy-free-game", { bet });
+  const out = await fetchApi<BackendResponse<BackendPlayData>>(
+    "/buy-free-game",
+    { bet },
+  );
   return out.data;
 }
 
 /** POST /jackpot – claim jackpot. */
 export async function jackpot(): Promise<{ win: number; balance: number }> {
-  const out = await fetchApi<BackendResponse<{ win: number; balance: number }>>("/jackpot", {});
+  const out = await fetchApi<BackendResponse<{ win: number; balance: number }>>(
+    "/jackpot",
+    {},
+  );
   return out.data;
 }
 
@@ -134,7 +168,9 @@ export async function jackpot(): Promise<{ win: number; balance: number }> {
  */
 export function backendReelToGrid(reel: BackendReel): number[][] {
   // 1. Map string identifiers to numeric domain indices
-  const indexGrid = reel.map((row) => row.map((name) => symbolNameToIndex(name)));
+  const indexGrid = reel.map((row) =>
+    row.map((name) => symbolNameToIndex(name)),
+  );
 
   let finalGrid: number[][];
 

@@ -5,131 +5,276 @@ import { type CascadeOrchestrator } from "../orchestrators/CascadeOrchestrator";
 import { type UIManager } from "../../presentation/ui/UIManager";
 import { type JackpotPresenter } from "../../presentation/ui/JackpotPresenter";
 import { CONFIG } from "../../domain/constants/Config";
+import { type AutoSpinConfig } from "../../presentation/ui/AutoSpinModal";
 
 /**
  * Orchestrates the high-level game flow.
  * Connects UI events to domain state and infrastructure APIs.
  */
 export class GameController {
-    private state: GameState;
-    private ui: UIManager;
-    private spinOrchestrator: SpinOrchestrator;
-    private cascadeOrchestrator: CascadeOrchestrator;
-    private jackpotPresenter: JackpotPresenter;
+  private state: GameState;
+  private ui: UIManager;
+  private spinOrchestrator: SpinOrchestrator;
+  private cascadeOrchestrator: CascadeOrchestrator;
+  private jackpotPresenter: JackpotPresenter;
+  private onBonusTriggered?: (count: number) => Promise<void>;
+  private onBonusEnded?: () => Promise<void>;
 
-    private isSpinning: boolean = false;
-    private isAutoSpinning: boolean = false;
+  private isSpinning: boolean = false;
+  private isAutoSpinning: boolean = false;
+  private autoSpinConfig: AutoSpinConfig | null = null;
+  private sessionStartBalance: number = 0;
 
-    constructor(
-        state: GameState,
-        ui: UIManager,
-        spinOrchestrator: SpinOrchestrator,
-        cascadeOrchestrator: CascadeOrchestrator,
-        jackpotPresenter: JackpotPresenter
-    ) {
-        this.state = state;
-        this.ui = ui;
-        this.spinOrchestrator = spinOrchestrator;
-        this.cascadeOrchestrator = cascadeOrchestrator;
-        this.jackpotPresenter = jackpotPresenter;
+  constructor(
+    state: GameState,
+    ui: UIManager,
+    spinOrchestrator: SpinOrchestrator,
+    cascadeOrchestrator: CascadeOrchestrator,
+    jackpotPresenter: JackpotPresenter,
+  ) {
+    this.state = state;
+    this.ui = ui;
+    this.spinOrchestrator = spinOrchestrator;
+    this.cascadeOrchestrator = cascadeOrchestrator;
+    this.jackpotPresenter = jackpotPresenter;
+  }
+
+  public setBonusTriggerCallback(callback: (count: number) => Promise<void>) {
+    this.onBonusTriggered = callback;
+  }
+
+  public setBonusEndCallback(callback: () => Promise<void>) {
+    this.onBonusEnded = callback;
+  }
+
+  /**
+   * Entry point for a standard spin.
+   */
+  public async handleSpinRequest(): Promise<void> {
+    if (this.isSpinning) return;
+
+    const bet = this.state.currentBet;
+    if (this.state.balance < bet && this.state.freeSpinsCount <= 0) {
+      this.ui.container.emit("insufficientBalance");
+      this.stopAutoSpin();
+      return;
     }
 
-    /**
-     * Entry point for a standard spin.
-     */
-    public async handleSpinRequest(): Promise<void> {
-        if (this.isSpinning) return;
-        
-        const bet = this.state.currentBet;
-        if (this.state.balance < bet && this.state.freeSpinsCount <= 0) {
-            this.ui.container.emit("insufficientBalance");
-            return;
-        }
+    this.isSpinning = true;
 
-        this.isSpinning = true;
+    try {
+      while (true) {
+        this.ui.winPresenter.hide(); // Hide any active result panels
         this.state.totalWin = 0; // Reset win at start of spin
         this.updateUI();
 
-        this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0);
+        this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0, this.isAutoSpinning);
         this.spinOrchestrator.showSpinFeedback(this.state.freeSpinsCount > 0);
 
-        try {
-            const response = await this.executeSpin(bet);
-            await this.processSpinResult(response);
-        } catch (error) {
-            console.error("Spin error:", error);
-        } finally {
-            this.isSpinning = false;
-            this.updateUI();
-        }
-    }
+        const response = await this.executeSpin(bet);
+        await this.processSpinResult(response);
 
-    private async executeSpin(bet: number): Promise<slotApi.BackendPlayData> {
+        // If we still have free spins, continue the loop automatically
         if (this.state.freeSpinsCount > 0) {
-            return await slotApi.playFreeGame(bet);
+          // Delay between sequential free spins
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        } else {
+          break;
         }
-        return await slotApi.play(bet);
+      }
+    } catch (error) {
+      console.error("Spin error:", error);
+      this.stopAutoSpin();
+    } finally {
+      this.isSpinning = false;
+      this.updateUI();
+    }
+  }
+
+  public get autoSpinActive(): boolean {
+    return this.isAutoSpinning;
+  }
+
+  public async startAutoSpin(config: AutoSpinConfig) {
+    if (this.isAutoSpinning) return;
+
+    this.isAutoSpinning = true;
+    this.autoSpinConfig = config;
+    this.sessionStartBalance = this.state.balance;
+
+    while (this.isAutoSpinning && this.autoSpinConfig && this.autoSpinConfig.count > 0) {
+      // 1. Wait for any current spin to finish
+      if (this.isSpinning) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
+      }
+
+      // 2. Perform spin
+      await this.handleSpinRequest();
+
+      // 3. Decrement count
+      this.autoSpinConfig.count--;
+
+      // 4. Check stop conditions
+      if (this.autoSpinConfig.stopOnWin && this.state.totalWin > 0) {
+        this.stopAutoSpin();
+        break;
+      }
+
+      const sessionLoss = this.sessionStartBalance - this.state.balance;
+      if (this.autoSpinConfig.stopOnLossLimit > 0 && sessionLoss >= this.autoSpinConfig.stopOnLossLimit) {
+        this.stopAutoSpin();
+        break;
+      }
+
+      if (!this.isAutoSpinning) break;
+
+      // Small delay between auto spins
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    private async processSpinResult(data: slotApi.BackendPlayData): Promise<void> {
-        const grid = slotApi.backendReelToGrid(data.slot.reel);
-        
-        // 1. Initial State Update (Trust balance from backend)
-        this.state.balance = data.balance;
-        this.state.freeSpinsCount = data.free_spin?.count ?? 0;
-        
-        const finalSpinWin = data.total_win;
-        const baseEvaluationWin = data.win;
+    this.stopAutoSpin();
+  }
 
-        return new Promise<void>((resolve) => {
-            this.spinOrchestrator.animateReels(grid, !!data.free_spin?.count, async () => {
-                
-                // 2. Handle Jackpots
-                if (data.jackpot_hit && data.jackpot_type) {
-                    const winAmount = data.jackpot_prizes?.[data.jackpot_type] || 0;
-                    await this.jackpotPresenter.show(data.jackpot_type, winAmount);
-                }
+  public stopAutoSpin() {
+    this.isAutoSpinning = false;
+    this.autoSpinConfig = null;
+    this.updateUI();
+  }
 
-                // 3. Play Cascades
-                if (data.slot.cascaded && data.slot.cascaded.length > 0) {
-                    await this.cascadeOrchestrator.play(
-                        data.slot.cascaded,
-                        baseEvaluationWin,
-                        this.state.currentBet,
-                        (accWin) => {
-                            // Visually update win, but don't exceed backend final total_win
-                            this.state.totalWin = Math.min(accWin, finalSpinWin);
-                            this.updateUI();
-                        }
-                    );
-                }
+  private async executeSpin(bet: number): Promise<slotApi.BackendPlayData> {
+    if (this.state.freeSpinsCount > 0) {
+      return await slotApi.playFreeGame(bet);
+    }
+    return await slotApi.play(bet);
+  }
 
-                // 4. Force Final State Sync & Celebration
-                this.state.totalWin = finalSpinWin;
+  private async processSpinResult(
+    data: slotApi.BackendPlayData,
+  ): Promise<void> {
+    const grid = slotApi.backendReelToGrid(data.slot.reel);
+
+    // 1. Initial State Update (Trust balance from backend)
+    const wasFreeSpin = this.state.freeSpinsCount > 0;
+    this.state.balance = data.balance;
+    this.state.freeSpinsCount = data.free_spin?.count ?? 0;
+    const isFreeSpinNow = this.state.freeSpinsCount > 0;
+
+    const finalSpinWin = data.total_win;
+    const baseEvaluationWin = data.win;
+
+    return new Promise<void>((resolve) => {
+      this.spinOrchestrator.animateReels(
+        grid,
+        !!data.free_spin?.count,
+        async () => {
+          // 2. Handle Jackpots
+          if (data.jackpot_hit && data.jackpot_type) {
+            const winAmount = data.jackpot_prizes?.[data.jackpot_type] || 0;
+            await this.jackpotPresenter.show(data.jackpot_type, winAmount);
+          }
+
+          // 3. Play Cascades
+          if (data.slot.cascaded && data.slot.cascaded.length > 0) {
+            await this.cascadeOrchestrator.play(
+              data.slot.cascaded,
+              baseEvaluationWin,
+              this.state.currentBet,
+              (accWin) => {
+                // Visually update win, but don't exceed backend final total_win
+                this.state.totalWin = Math.min(accWin, finalSpinWin);
                 this.updateUI();
+              },
+            );
+          }
 
-                // If Big/Mega/Max win, trigger the celebration
-                if (finalSpinWin >= this.state.currentBet * (CONFIG.BIG_WIN_MULTIPLIER ?? 10)) {
-                    await this.ui.winPresenter.showTierWin(finalSpinWin, this.state.currentBet);
-                }
-                
-                resolve();
-            });
-        });
-    }
+          // 4. Final Celebration & Summary
+          if (data.free_spin && (data.free_spin.add ?? 0) > 0) {
+            // New trigger or re-trigger
+            if (this.onBonusTriggered) {
+              await this.onBonusTriggered(data.free_spin.add!);
+            }
+          }
 
-    public handleBetAdjust(delta: -1 | 1): void {
-        const nextBet = this.state.getNextBetAmount(delta);
-        this.state.currentBet = nextBet;
-        this.updateUI();
-    }
+          if (data.is_free_spin) {
+            this.state.bonusSessionWin += finalSpinWin;
+            this.ui.updateTextValues(
+              this.state.balance,
+              this.state.bonusSessionWin,
+              this.state.freeSpinsCount,
+              true,
+            );
+            // Completely suppress individual winText popups during active bonus spins
+            this.ui.winText.text = "";
+            
+            // If this was the absolute last free spin, show the final celebration
+            if (this.state.freeSpinsCount === 0 && this.state.bonusSessionWin > 0) {
+              const totalBonusWin = this.state.bonusSessionWin;
+              const isBigWin = totalBonusWin >= this.state.currentBet * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
+              
+              if (isBigWin) {
+                await this.ui.winPresenter.showTierWin(totalBonusWin, this.state.currentBet);
+              } else {
+                this.ui.winText.text = `TOTAL BONUS WIN\n₱${totalBonusWin.toLocaleString()}`;
+                this.ui.winPresenter.showWin();
+                await new Promise((resolve) => setTimeout(resolve, 2500));
+                this.ui.winPresenter.hide();
+              }
+            }
+          } else if (finalSpinWin > 0) {
+            const isBigWin =
+              finalSpinWin >=
+              this.state.currentBet * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
 
-    public updateUI(): void {
-        this.ui.updateTextValues(
-            this.state.balance,
-            this.state.totalWin,
-            this.state.freeSpinsCount
-        );
-        this.ui.updateBetTextDisplay(this.state.currentBet.toString());
-    }
+            if (isBigWin) {
+              await this.ui.winPresenter.showTierWin(
+                finalSpinWin,
+                this.state.currentBet,
+              );
+            } else {
+              this.ui.updateTextValues(
+                this.state.balance,
+                finalSpinWin,
+                this.state.freeSpinsCount,
+              );
+              this.ui.winText.text = `WIN\n₱${finalSpinWin.toLocaleString()}`;
+              this.ui.winPresenter.showWin();
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+              this.ui.winPresenter.hide();
+            }
+          }
+
+          if (wasFreeSpin && !isFreeSpinNow) {
+            // Free spins just ended
+            if (this.onBonusEnded) {
+              await this.onBonusEnded();
+            }
+          }
+
+          resolve();
+        },
+      );
+    });
+  }
+
+  public handleBetAdjust(delta: -1 | 1): void {
+    const nextBet = this.state.getNextBetAmount(delta);
+    this.state.currentBet = nextBet;
+    this.updateUI();
+  }
+
+  public handleBetConfirm(bet: number): void {
+    this.state.currentBet = bet;
+    this.updateUI();
+  }
+
+  public updateUI(): void {
+    this.ui.updateTextValues(
+      this.state.balance,
+      this.state.totalWin,
+      this.state.freeSpinsCount,
+    );
+    this.ui.updateBetTextDisplay(this.state.currentBet.toString());
+    this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0, this.isAutoSpinning);
+  }
 }

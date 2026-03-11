@@ -9,10 +9,11 @@ app.use(express.json());
 
 let playerBalance = 100000;
 let freeSpinCounter = 0;
+let sessionBonusWin = 0;
 
-// ==========================================================
+
 // CONFIGURATION & RULES
-// ==========================================================
+
 const CFG = {
     SPINS_ON_SCATTER: 2,
     SPINS_ON_BUY: 5,
@@ -35,38 +36,45 @@ const CFG = {
         "s1":   [0, 0,  25,  40,  75],   
         "s2":   [0, 0,  60,  95, 140],   
         "s3":   [0, 0,  40,  60, 100],   
-        "s4":   [0, 0, 100, 150, 250],   
+        "s4":   [0, 0,  100, 250, 400],   
         "wild": [0, 0,   0,   0,   0],
         "sc":   [0, 0,   0,   0,   0]
     }
 };
 
-// ==========================================================
+
 // DEBUG CONTROL
-// ==========================================================
+
 const DEBUG_CONFIG = {
     USE_CUSTOM_GRID: false, 
     LOG_CALCULATIONS: true,
-    SHOWCASE_TIERS: true, // AUTO CYCLE FOR FRONTEND TESTING
+    SHOWCASE_TIERS: true, 
 };
 
 let debugSpinIndex = 0;
 
-const CUSTOM_GRID = [
-    ["s1", "a", "k"],  
-    ["s1", "q", "a"], 
-    ["s1", "j", "k"],  
-    ["s1", "wild", "s1"], 
-    ["s1", "s2", "s3"],   
-];
+// Helper to convert easier-to-edit row-based grid into internal column-based format
+function visualToInternal(rows) {
+    const internal = [[], [], [], [], []];
+    for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 5; c++) {
+            internal[c][r] = rows[r][c];
+        }
+    }
+    return internal;
+}
 
-const CUSTOM_FREE_SPIN_GRID = [
-    ["sc", "s4", "s3"],
-    ["s4", "s3", "s2"],
-    ["s4", "sc", "s2"],
-    ["s4", "s3", "s2"],
-    ["s4", "s3", "sc"],
-];
+const CUSTOM_GRID = visualToInternal([
+    ["s2", "s2", "s2", "a",  "k"],  // Row 0
+    ["a",  "j",  "s2", "q",  "a"],  // Row 1
+    ["k",  "j",  "s2", "j",  "k"],  // Row 2
+]);
+
+const CUSTOM_FREE_SPIN_GRID = visualToInternal([
+    ["sc", "s4", "sc", "s4", "sc"], // Row 0
+    ["s4", "s3", "sc", "s3", "s4"], // Row 1
+    ["s3", "s2", "s3", "s2", "s3"], // Row 2
+]);
 
 const STAGED_CASCADE_DROPS = [
     ["k", "k", "k", "k", "k"],    
@@ -76,9 +84,8 @@ const STAGED_CASCADE_DROPS = [
     ["s4", "s4", "s4", "s4", "s4"]
 ];
 
-// ==========================================================
+
 // MATH CORE
-// ==========================================================
 
 function logCalc(message) {
     if (DEBUG_CONFIG.LOG_CALCULATIONS) {
@@ -90,9 +97,9 @@ function resolveBet(req) {
     const bets = req.body?.bets;
     if (bets?.bet_size && bets?.bet_level) {
         return { 
-            betAmount: bets.bet_size * bets.bet_level * CFG.BASE_BET_MULT, 
+            betAmount: bets.bet_size * 1 * CFG.BASE_BET_MULT, 
             bet_size: bets.bet_size, 
-            bet_level: bets.bet_level 
+            bet_level: 1 
         };
     }
     const betAmount = req.body?.bet || 300;
@@ -124,7 +131,7 @@ function generateRandomGrid(forceScatters = false, isFreeSpin = false) {
 function evaluateWays(grid, bet) {
     let winnings = [];
     let totalWin = 0;
-    const unitBet = bet / 100;
+    const unitBet = bet / 30; // 30 is the BASE_BET_MULT. Payout = Multiplier * Ways * BetSize (where BetSize = TotalBet / 30)
 
     const uniqueSymbols = [...new Set(grid[0])].filter(s => s !== 'sc' && s !== 'wild');
 
@@ -144,6 +151,7 @@ function evaluateWays(grid, bet) {
             const basePayout = CFG.SYMBOL_PAYOUTS[sym][length - 1];
             const payout = basePayout * ways * unitBet;
             if (payout > 0) {
+                logCalc(`  [LINE WIN] Symbol: [${sym.toUpperCase()}] | Length: ${length} | Ways: ${ways} | UnitBet: ${unitBet} | Formula: (${basePayout} * ${ways} * ${unitBet}) = ${payout}`);
                 totalWin += payout;
                 const positions = [];
                 for (let c = 0; c < length; c++) {
@@ -277,7 +285,21 @@ function generatePlayResult(req, betAmount, isFreeSpin = false) {
     for (let c = 0; c < 5; c++) for (let r = 0; r < 3; r++) if (grid[c][r] === 'sc') scatterPositions.push({ column: c, row: r });
     const triggered = scatterPositions.length >= CFG.SCATTER_TRIGGER;
 
+    if (triggered) {
+        freeSpinCounter += isFreeSpin ? CFG.SPINS_ON_SCATTER : CFG.SPINS_ON_SCATTER;
+        logCalc(`SCATTER TRIGGERED: +${CFG.SPINS_ON_SCATTER} free spins. Total: ${freeSpinCounter}`);
+    }
+
     logCalc(`FINAL TOTAL WIN REPORTED: ${finalTotalWin}`);
+    
+    // Summary of Math for current spin
+    let mathSummary = `MATH: (${baseWin} * 1)`;
+    for (const c of cascaded) {
+        mathSummary += ` + (${c.win} * ${c.multiplier})`;
+    }
+    mathSummary += ` = ${finalTotalWin}`;
+    console.log(`[DEBUG] ${mathSummary}`);
+
     console.log(`--- SPIN END ---\n`);
 
     return {
@@ -294,21 +316,36 @@ function generatePlayResult(req, betAmount, isFreeSpin = false) {
             triggered
         },
         slot: { reel: grid, winnings, cascaded },
-        free_spin: triggered ? { count: CFG.SPINS_ON_SCATTER, add: CFG.SPINS_ON_SCATTER } : null
+        free_spin: freeSpinCounter > 0 ? { count: freeSpinCounter, add: triggered ? (isFreeSpin ? CFG.SPINS_ON_SCATTER : CFG.SPINS_ON_SCATTER) : 0 } : null
     };
 }
 
-// ==========================================================
 // ROUTES
-// ==========================================================
+
 
 app.post("/load", (req, res) => {
-    res.json({ success: true, data: { player: { balance: playerBalance }, jackpot_prizes: CFG.JACKPOT } });
+    // If no free spins, always ensure session bonus win is reset
+    if (freeSpinCounter <= 0) {
+        sessionBonusWin = 0;
+    }
+
+    res.json({
+        success: true,
+        data: {
+            player: { balance: playerBalance },
+            jackpot_prizes: CFG.JACKPOT,
+            free_spin: {
+                count: freeSpinCounter || 0,
+                total_win: sessionBonusWin
+            },
+        }
+    });
 });
 
 app.post("/play", (req, res) => {
     const { betAmount } = resolveBet(req);
     playerBalance -= betAmount;
+    sessionBonusWin = 0; // Reset bonus session on any new base game spin
     const result = generatePlayResult(req, betAmount, false);
     playerBalance = result.balance;
     res.json({ success: true, data: result });
@@ -316,7 +353,13 @@ app.post("/play", (req, res) => {
 
 app.post("/play-free-game", (req, res) => {
     const { betAmount } = resolveBet(req);
+    // FREE GAMES DON'T DEDUCT BALANCE
+    if (freeSpinCounter <= 0) {
+        return res.json({ success: false, error: "No free spins remaining" });
+    }
+    freeSpinCounter--;
     const result = generatePlayResult(req, betAmount, true);
+    sessionBonusWin += result.total_win;
     playerBalance = result.balance;
     res.json({ success: true, data: result });
 });
@@ -324,9 +367,11 @@ app.post("/play-free-game", (req, res) => {
 app.post("/buy-free-game", (req, res) => {
     const { betAmount } = resolveBet(req);
     playerBalance -= (betAmount * CFG.BUY_COST_MULT);
+    freeSpinCounter += CFG.SPINS_ON_BUY;
+    sessionBonusWin = 0; // Reset for new buy
     const result = generatePlayResult(req, betAmount, false); 
     result.scatters.triggered = true;
-    result.free_spin = { count: CFG.SPINS_ON_BUY, add: CFG.SPINS_ON_BUY };
+    result.free_spin = { count: freeSpinCounter, add: CFG.SPINS_ON_BUY, total_win: 0 };
     playerBalance = result.balance;
     res.json({ success: true, data: result });
 });
@@ -337,5 +382,12 @@ app.listen(PORT, () => {
     console.log(`  Target: http://localhost:${PORT}`);
     console.log(`  Detailed Math Logging: ENABLED`);
     console.log(`  Custom Grid: ENABLED`);
+    console.log(`----------------------------------------------------------`);
+    console.log(`  CALCULATION RULES:`);
+    console.log(`  1. Bet Size      = Total Bet / 30`);
+    console.log(`  2. Line Win      = SymbolPayout(len) * Ways * Bet Size`);
+    console.log(`  3. Cascade Mult  = Base(x1), then x2 -> x3 -> x4 -> x5 -> x6`);
+    console.log(`  4. Total Win     = (BaseWin * 1) + sum(CascadeWin * Mult)`);
+    console.log(`  5. Max Win Cap   = Total Bet * ${CFG.MAX_WIN_MULT}x`);
     console.log(`==========================================================\n`);
 });

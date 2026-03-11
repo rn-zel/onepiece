@@ -1,10 +1,10 @@
 export type WinTier = "none" | "big" | "mega" | "max";
 
 export type WinTierEventPayload = {
-    tier: WinTier;
-    totalWin: number;
-    betAmount: number;
-    isFreeSpins: boolean;
+  tier: WinTier;
+  totalWin: number;
+  betAmount: number;
+  isFreeSpins: boolean;
 };
 
 type Handler = (payload: WinTierEventPayload) => void;
@@ -15,19 +15,18 @@ type Handler = (payload: WinTierEventPayload) => void;
  * listeners can subscribe without tight coupling.
  */
 export class WinEvents {
-    private static listeners: Handler[] = [];
+  private static listeners: Handler[] = [];
 
-    static subscribe(handler: Handler): () => void {
-        this.listeners.push(handler);
-        return () => {
-            this.listeners = this.listeners.filter((h) => h !== handler);
-        };
-    }
+  static subscribe(handler: Handler): () => void {
+    this.listeners.push(handler);
+    return () => {
+      this.listeners = this.listeners.filter((h) => h !== handler);
+    };
+  }
 
-    static emit(payload: WinTierEventPayload): void {
-        for (const handler of this.listeners) {
-            handler(payload);
-        }
+  static emit(payload: WinTierEventPayload): void {
+    for (const handler of this.listeners) {
+      handler(payload);
     }
+  }
 }
-

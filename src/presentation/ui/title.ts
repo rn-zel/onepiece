@@ -80,7 +80,7 @@ import { CONFIG } from "../../domain/constants/Config";
 
 //         this.animSprite.animationSpeed = CONFIG.TITLE_ANIM_SPEED;
 //         this.animSprite.loop = true;
-//         this.animSprite.visible = false; 
+//         this.animSprite.visible = false;
 
 //         this.animSprite.tint = this.isFreeSpinsTheme
 //             ? CONFIG.UI_COLORS.FREE_SPINS_TINT
@@ -119,29 +119,31 @@ import { CONFIG } from "../../domain/constants/Config";
 // }
 
 export class TitleUI {
-    private container: Container;
-    private titleSprite: Sprite;
+  private container: Container;
+  private titleSprite: Sprite;
 
-    constructor() {
-        this.container = new Container();
-        this.titleSprite = new Sprite(Assets.get("title.png"));
-        this.titleSprite.anchor.set(0, 0);
-        this.titleSprite.x = CONFIG.TITLE_LANDSCAPE_X;
-        this.titleSprite.y = CONFIG.TITLE_LANDSCAPE_Y;
-        this.titleSprite.scale.set(CONFIG.TITLE_LANDSCAPE_SCALE);
-        this.container.addChild(this.titleSprite);
-    }
+  constructor() {
+    this.container = new Container();
+    this.titleSprite = new Sprite(Assets.get("title.png"));
+    this.titleSprite.anchor.set(0, 0);
+    this.titleSprite.x = CONFIG.TITLE_LANDSCAPE_X;
+    this.titleSprite.y = CONFIG.TITLE_LANDSCAPE_Y;
+    this.titleSprite.scale.set(CONFIG.TITLE_LANDSCAPE_SCALE);
+    this.container.addChild(this.titleSprite);
+  }
 
-    public setTheme(isFreeSpins: boolean) {
-        if (!this.titleSprite) return;
-        this.titleSprite.tint = isFreeSpins ? CONFIG.UI_COLORS.FREE_SPINS_TINT : CONFIG.UI_COLORS.DEFAULT_TINT;
-    }
+  public setTheme(isFreeSpins: boolean) {
+    if (!this.titleSprite) return;
+    this.titleSprite.tint = isFreeSpins
+      ? CONFIG.UI_COLORS.FREE_SPINS_TINT
+      : CONFIG.UI_COLORS.DEFAULT_TINT;
+  }
 
-    public updateResponsiveLayout(isPortrait: boolean) {
-        this.container.visible = !isPortrait; // Hide title in portrait
-    }
+  public updateResponsiveLayout(isPortrait: boolean) {
+    this.container.visible = !isPortrait; // Hide title in portrait
+  }
 
-    getContainer(): Container { 
-        return this.container;
-    }
+  getContainer(): Container {
+    return this.container;
+  }
 }
