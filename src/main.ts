@@ -11,7 +11,7 @@ import {
 import { Starfield } from "./presentation/animation/Starfield";
 import { SymbolAnimator } from "./presentation/animation/SymbolAnimator";
 import { WaterBg } from "./presentation/animation/WaterBg";
-
+console.log(window.devicePixelRatio);
 (async () => {
   try {
     const container = document.getElementById("app-container")!;

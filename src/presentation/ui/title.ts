@@ -140,7 +140,15 @@ export class TitleUI {
   }
 
   public updateResponsiveLayout(isPortrait: boolean) {
-    this.container.visible = !isPortrait; // Hide title in portrait
+    if (isPortrait) {
+      this.titleSprite.x = CONFIG.TITLE_PORTRAIT_X;
+      this.titleSprite.y = CONFIG.TITLE_PORTRAIT_Y;
+      this.titleSprite.scale.set(CONFIG.TITLE_PORTRAIT_SCALE);
+    } else {
+      this.titleSprite.x = CONFIG.TITLE_LANDSCAPE_X;
+      this.titleSprite.y = CONFIG.TITLE_LANDSCAPE_Y;
+      this.titleSprite.scale.set(CONFIG.TITLE_LANDSCAPE_SCALE);
+    }
   }
 
   getContainer(): Container {

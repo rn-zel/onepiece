@@ -106,18 +106,11 @@ export class SpinOrchestrator {
 
     // Use a more intense rotation during reel spin
     gsap.to(this.uiManager.spinButton, {
-      rotation: "+=" + Math.PI * 12,
-      duration: 2.0,
-      ease: "power2.in",
-      onComplete: () => {
-        gsap.to(this.uiManager.spinButton, {
-          rotation: "+=" + Math.PI * 4,
-          duration: 1,
-          repeat: -1,
-          ease: "none",
-          overwrite: "auto",
-        });
-      },
+      rotation: "+=" + Math.PI * 4,
+      duration: CONFIG.SPIN_BTN_SPIN_SPEED,
+      repeat: -1,
+      ease: "none",
+      overwrite: "auto",
     });
 
     // Reset symbol state
@@ -209,10 +202,22 @@ export class SpinOrchestrator {
 
             this.starfield?.triggerWarp(false);
             if (targetGrid) this.applyGrid(targetGrid);
+            this.returnToIdle();
             onDone();
           }
         },
       });
+    });
+  }
+
+  public returnToIdle(): void {
+    gsap.killTweensOf(this.uiManager.spinButton, { rotation: true });
+    gsap.to(this.uiManager.spinButton, {
+      rotation: "+=" + Math.PI * 2,
+      duration: CONFIG.SPIN_BTN_IDLE_SPEED,
+      repeat: -1,
+      ease: "none",
+      overwrite: "auto",
     });
   }
 
@@ -243,7 +248,7 @@ export class SpinOrchestrator {
     });
     gsap.to(this.uiManager.spinButton, {
       rotation: "+=" + Math.PI * 4,
-      duration: 0.8,
+      duration: CONFIG.SPIN_BTN_SPIN_SPEED,
       repeat: -1,
       ease: "none",
       overwrite: "auto",

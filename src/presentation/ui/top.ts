@@ -1,4 +1,5 @@
-import { Container, Sprite, Assets, Text } from "pixi.js";
+import { Container, Sprite, Assets, Text, Graphics, BlurFilter } from "pixi.js";
+import gsap from "gsap";
 import { CONFIG, GAME_RULES } from "../../domain/constants/Config";
 
 export class TopUI {
@@ -15,6 +16,10 @@ export class TopUI {
   private majorContainer!: Container;
   private grandContainer!: Container;
 
+  private miniGlow!: Graphics;
+  private majorGlow!: Graphics;
+  private grandGlow!: Graphics;
+
   constructor() {
     this.container = new Container();
 
@@ -24,6 +29,11 @@ export class TopUI {
     this.miniContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
     this.container.addChild(this.miniContainer);
 
+    // Mini Glow (Blue)
+    this.miniGlow = this.createGlow( 0xffc107);
+    this.miniGlow.position.set(320, 170);
+    this.miniContainer.addChild(this.miniGlow);
+
     this.miniSprite = new Sprite(Assets.get("mini.png"));
     this.miniSprite.anchor.set(0, 0);
     this.miniContainer.addChild(this.miniSprite);
@@ -31,10 +41,10 @@ export class TopUI {
     this.miniText = this.createJackpotText(
       380, // Text Offset X (Hardcoded for now as it's a relative offset)
       200, // Text Offset Y
-      0x9c7740,
-      60,
-      0x000000,
-      4,
+      CONFIG.JACKPOT_VALUE_FILL,
+      CONFIG.UI_JACKPOT_MINI_SIZE,
+      CONFIG.JACKPOT_VALUE_STROKE_COLOR,
+      CONFIG.JACKPOT_VALUE_STROKE_WIDTH,
     );
     this.miniContainer.addChild(this.miniText);
 
@@ -44,6 +54,11 @@ export class TopUI {
     this.majorContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
     this.container.addChild(this.majorContainer);
 
+    // Major Glow (Yellow/Amber)
+    this.majorGlow = this.createGlow(0x29b6f6);
+    this.majorGlow.position.set(300, 170);
+    this.majorContainer.addChild(this.majorGlow);
+
     this.majorSprite = new Sprite(Assets.get("major.png"));
     this.majorSprite.anchor.set(0, 0);
     this.majorContainer.addChild(this.majorSprite);
@@ -51,10 +66,10 @@ export class TopUI {
     this.majorText = this.createJackpotText(
       380,
       200,
-      0x9c7740,
-      60,
-      0x000000,
-      4,
+      CONFIG.JACKPOT_VALUE_FILL,
+      CONFIG.UI_JACKPOT_MAJOR_SIZE,
+      CONFIG.JACKPOT_VALUE_STROKE_COLOR,
+      CONFIG.JACKPOT_VALUE_STROKE_WIDTH,
     );
     this.majorContainer.addChild(this.majorText);
 
@@ -64,6 +79,11 @@ export class TopUI {
     this.grandContainer.scale.set(CONFIG.JACKPOT_LANDSCAPE_SCALE);
     this.container.addChild(this.grandContainer);
 
+    // Grand Glow (Pink/Red)
+    this.grandGlow = this.createGlow(0xe91e63);
+    this.grandGlow.position.set(300, 190);
+    this.grandContainer.addChild(this.grandGlow);
+
     this.grandSprite = new Sprite(Assets.get("grand.png"));
     this.grandSprite.anchor.set(0, 0);
     this.grandContainer.addChild(this.grandSprite);
@@ -71,12 +91,49 @@ export class TopUI {
     this.grandText = this.createJackpotText(
       420,
       200,
-      0x9c7740,
-      60,
-      0x000000,
-      4,
+      CONFIG.JACKPOT_VALUE_FILL,
+      CONFIG.UI_JACKPOT_GRAND_SIZE,
+      CONFIG.JACKPOT_VALUE_STROKE_COLOR,
+      CONFIG.JACKPOT_VALUE_STROKE_WIDTH,
     );
     this.grandContainer.addChild(this.grandText);
+
+    this.startGlowAnimations();
+  }
+
+  private createGlow(color: number): Graphics {
+    const g = new Graphics();
+    g.circle(0, 0, 150).fill({ color, alpha: 0.8 });
+    
+    g.scale.set(3.0, 1.2);
+    
+    const blur = new BlurFilter();
+    blur.blur = 80;
+    g.filters = [blur];
+    
+    g.blendMode = "add";
+    g.alpha = 1;
+    return g;
+  }
+
+  private startGlowAnimations() {
+    [this.miniGlow, this.majorGlow, this.grandGlow].forEach((g, i) => {
+      gsap.to(g.scale, {
+        x: 1.3,
+        y: 1.3,
+        duration: 2 + i * 0.5,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+      gsap.to(g, {
+        alpha: 0.6,
+        duration: 1.5 + i * 0.5,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+    });
   }
 
   private createJackpotText(
@@ -96,6 +153,7 @@ export class TopUI {
         stroke: { color: strokeColor, width: strokeWidth },
         letterSpacing: 2,
       },
+      resolution: CONFIG.UI_JACKPOT_RESOLUTION,
     });
     text.anchor.set(0.5);
     text.position.set(x, y);

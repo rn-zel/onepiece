@@ -22,7 +22,15 @@ export class LeftTopUI {
   }
 
   public updateResponsiveLayout(isPortrait: boolean) {
-    this.container.visible = !isPortrait; // Hide hat in portrait
+    if (isPortrait) {
+      this.hatSprite.x = CONFIG.HAT_PORTRAIT_X;
+      this.hatSprite.y = CONFIG.HAT_PORTRAIT_Y;
+      this.hatSprite.scale.set(CONFIG.HAT_PORTRAIT_SCALE);
+    } else {
+      this.hatSprite.x = CONFIG.HAT_LANDSCAPE_X;
+      this.hatSprite.y = CONFIG.HAT_LANDSCAPE_Y;
+      this.hatSprite.scale.set(CONFIG.HAT_LANDSCAPE_SCALE);
+    }
   }
 
   getContainer(): Container {

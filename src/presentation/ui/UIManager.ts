@@ -83,15 +83,21 @@ export class UIManager {
 
   private createUI() {
     const glowStyle = new TextStyle({
-      fill: 0xffffff,
-      fontSize: 36,
+      fill: CONFIG.HUD_VALUE_FILL,
+      fontSize: CONFIG.UI_HUD_CREDIT_SIZE, // Start with credit size
       fontWeight: "bold",
-      dropShadow: { color: 0x00d9ff, blur: 6, distance: 0, angle: 0, alpha: 1 },
+      dropShadow: {
+        color: CONFIG.HUD_VALUE_GLOW_COLOR,
+        blur: CONFIG.HUD_VALUE_GLOW_BLUR,
+        distance: 0,
+        angle: 0,
+        alpha: 1,
+      },
       align: "center",
     });
     const titleStyle = new TextStyle({
       fill: CONFIG.TITLE_LABEL_FILL,
-      fontSize: 22,
+      fontSize: CONFIG.UI_HUD_TITLE_SIZE,
       fontWeight: "bold",
       dropShadow: {
         color: CONFIG.TITLE_LABEL_GLOW,
@@ -188,11 +194,11 @@ export class UIManager {
     this.container.addChild(this.statsButton);
 
     // BALANCE
-    this.balanceTitle = new Text({ text: "Balance", style: titleStyle });
+    this.balanceTitle = new Text({ text: "CREDIT", style: titleStyle });
     this.balanceTitle.anchor.set(0, 0.5);
     this.balanceTitle.x = CONFIG.HUD_BAL_TITLE_LANDSCAPE_X;
     this.balanceTitle.y = CONFIG.HUD_BAL_TITLE_LANDSCAPE_Y;
-    this.balanceTitle.resolution = 3;
+    this.balanceTitle.resolution = CONFIG.UI_HUD_RESOLUTION;
     this.balanceTitle.zIndex = 6;
     this.container.addChild(this.balanceTitle);
 
@@ -207,15 +213,15 @@ export class UIManager {
     this.balanceText.anchor.set(0, 0.5);
     this.balanceText.x = CONFIG.HUD_BAL_TEXT_LANDSCAPE_X;
     this.balanceText.y = CONFIG.HUD_BAL_TEXT_LANDSCAPE_Y;
-    this.balanceText.resolution = 3;
+    this.balanceText.resolution = CONFIG.UI_HUD_RESOLUTION;
     this.container.addChild(this.balanceText);
 
     // BET
-    this.betTitle = new Text({ text: "Bet", style: titleStyle });
+    this.betTitle = new Text({ text: "BET", style: titleStyle });
     this.betTitle.anchor.set(0, 0.5);
     this.betTitle.x = CONFIG.HUD_BET_TITLE_LANDSCAPE_X;
     this.betTitle.y = CONFIG.HUD_BET_TITLE_LANDSCAPE_Y;
-    this.betTitle.resolution = 3;
+    this.betTitle.resolution = CONFIG.UI_HUD_RESOLUTION;
     this.betTitle.zIndex = 6;
     this.container.addChild(this.betTitle);
 
@@ -226,11 +232,12 @@ export class UIManager {
     this.betBg.y = CONFIG.HUD_BET_BG_LANDSCAPE_Y;
     this.container.addChild(this.betBg);
 
-    this.betAmountText = new Text({ text: "₱0", style: glowStyle });
+    this.betAmountText = new Text({ text: "₱0", style: glowStyle.clone() }); // Clone to ensure separate control
+    this.betAmountText.style.fontSize = CONFIG.UI_HUD_BET_SIZE;
     this.betAmountText.anchor.set(0, 0.5);
     this.betAmountText.x = CONFIG.HUD_BET_TEXT_LANDSCAPE_X;
     this.betAmountText.y = CONFIG.HUD_BET_TEXT_LANDSCAPE_Y;
-    this.betAmountText.resolution = 3;
+    this.betAmountText.resolution = CONFIG.UI_HUD_RESOLUTION;
     this.betAmountText.interactive = true;
     this.betAmountText.cursor = "text";
     this.betAmountText.eventMode = "static";
@@ -246,11 +253,11 @@ export class UIManager {
     this.container.addChild(this.betAmountText);
 
     // TOTAL WIN
-    this.totalWinTitle = new Text({ text: "Total Win", style: titleStyle });
+    this.totalWinTitle = new Text({ text: "TOTAL WIN", style: titleStyle });
     this.totalWinTitle.anchor.set(0, 0);
     this.totalWinTitle.x = CONFIG.HUD_WIN_TITLE_LANDSCAPE_X;
     this.totalWinTitle.y = CONFIG.HUD_WIN_TITLE_LANDSCAPE_Y;
-    this.totalWinTitle.resolution = 3;
+    this.totalWinTitle.resolution = CONFIG.UI_HUD_RESOLUTION;
     this.totalWinTitle.zIndex = 6;
     this.container.addChild(this.totalWinTitle);
 
@@ -261,10 +268,11 @@ export class UIManager {
     this.winBg.y = CONFIG.HUD_WIN_BG_LANDSCAPE_Y;
     this.container.addChild(this.winBg);
 
-    this.totalWinText = new Text({ text: "₱0", style: glowStyle });
+    this.totalWinText = new Text({ text: "₱0", style: glowStyle.clone() });
+    this.totalWinText.style.fontSize = CONFIG.UI_HUD_TOTAL_WIN_SIZE;
     this.totalWinText.anchor.set(0.5, 0.5);
     this.totalWinText.x = CONFIG.HUD_WIN_TEXT_LANDSCAPE_X;
-    this.totalWinText.resolution = 3;
+    this.totalWinText.resolution = CONFIG.UI_HUD_RESOLUTION;
     this.totalWinText.y = CONFIG.HUD_WIN_TEXT_LANDSCAPE_Y;
     this.container.addChild(this.totalWinText);
 
@@ -297,14 +305,14 @@ export class UIManager {
       text: "",
       style: {
         fill: 0xffd700,
-        fontSize: 100,
+        fontSize: CONFIG.UI_WIN_SIZE,
         fontWeight: "bold",
         dropShadow: { color: 0x000000, blur: 15, distance: 0 },
         align: "center",
       },
     });
     this.winText.anchor.set(0.5);
-    this.winText.resolution = 2;
+    this.winText.resolution = CONFIG.UI_WIN_RESOLUTION;
     this.container.addChild(this.winText);
 
     // BONUS SPINS
@@ -312,14 +320,14 @@ export class UIManager {
       text: "",
       style: new TextStyle({
         fill: 0xff6b00,
-        fontSize: 40,
+        fontSize: CONFIG.UI_BONUS_SIZE,
         fontWeight: "bold",
         stroke: { color: 0x000000, width: 4 },
       }),
     });
     this.bonusSpinsText.anchor.set(0.5);
     this.bonusSpinsText.y = -450;
-    this.bonusSpinsText.resolution = 2;
+    this.bonusSpinsText.resolution = CONFIG.UI_WIN_RESOLUTION;
     this.container.addChild(this.bonusSpinsText);
 
     this.createTurboToggle();
@@ -392,9 +400,9 @@ export class UIManager {
     // Use only digits for size calculation
     const cleanNumber = display.replace(/[^0-9]/g, "");
     const len = cleanNumber.length;
-    let newSize = 36;
-    if (len >= 9) newSize = 27;
-    else if (len >= 7) newSize = 30;
+    let newSize = CONFIG.UI_HUD_BET_SIZE;
+    if (len >= 9) newSize = Math.floor(CONFIG.UI_HUD_BET_SIZE * 0.75);
+    else if (len >= 7) newSize = Math.floor(CONFIG.UI_HUD_BET_SIZE * 0.83);
     this.betAmountText.style.fontSize = newSize;
   }
 
@@ -413,9 +421,9 @@ export class UIManager {
     }
     
     if (isBonusWin) {
-      this.totalWinTitle.text = "Bonus Win";
+      this.totalWinTitle.text = "BONUS WIN";
     } else {
-      this.totalWinTitle.text = "Total Win";
+      this.totalWinTitle.text = "TOTAL WIN";
     }
   }
 

@@ -26,7 +26,15 @@ export class ModelUI {
   }
 
   public updateResponsiveLayout(isPortrait: boolean) {
-    this.container.visible = !isPortrait; // Hide character in portrait
+    if (isPortrait) {
+      this.modelSprite.x = CONFIG.MODEL_PORTRAIT_X;
+      this.modelSprite.y = CONFIG.MODEL_PORTRAIT_Y;
+      this.modelSprite.scale.set(CONFIG.MODEL_PORTRAIT_SCALE);
+    } else {
+      this.modelSprite.x = CONFIG.MODEL_LANDSCAPE_X;
+      this.modelSprite.y = CONFIG.MODEL_LANDSCAPE_Y;
+      this.modelSprite.scale.set(CONFIG.MODEL_LANDSCAPE_SCALE);
+    }
   }
 
   getContainer(): Container {

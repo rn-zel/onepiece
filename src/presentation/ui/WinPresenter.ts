@@ -250,7 +250,7 @@ export class WinPresenter {
     const style = new TextStyle({
       fill: 0xffd700,
       //  0xffd700,
-      fontSize: 100,
+      fontSize: CONFIG.UI_WIN_SIZE,
       fontWeight: "bold",
       dropShadow: { color: 0x000000, blur: 15, distance: 0 },
       align: "center",
@@ -271,13 +271,13 @@ export class WinPresenter {
 
     const style = new TextStyle({
       fontFamily: "Georgia, serif",
-      fontSize: 300,
+      fontSize: CONFIG.UI_TIER_WIN_SIZE,
       fontWeight: "900",
       align: "center",
-      letterSpacing: 5,
+      letterSpacing: CONFIG.UI_TIER_WIN_LETTER_SPACING,
       padding: 20,
       fill: fillColors,
-      stroke: { color: 0x000000, width: 12, join: "round" },
+      stroke: { color: 0x000000, width: CONFIG.UI_TIER_WIN_STROKE, join: "round" },
       dropShadow: {
         color: 0x000000,
         blur: 4,

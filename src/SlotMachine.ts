@@ -230,6 +230,7 @@ export class SlotMachine {
 
     slotApi.setSlotApiBaseUrl(CONFIG.API_BASE_URL);
     void this.loadFromBackend();
+    this.spinOrchestrator.returnToIdle();
   }
 
   private async loadFromBackend() {
@@ -632,6 +633,11 @@ export class SlotMachine {
       this.uiManager.handleResize(screenWidth, screenHeight);
       this.buyFreeSpinsModal?.handleResize(screenWidth, screenHeight);
     }
+
+    this.modelUI?.updateResponsiveLayout(isPortrait);
+    this.titleUI?.updateResponsiveLayout(isPortrait);
+    this.leftTopUI?.updateResponsiveLayout(isPortrait);
+    this.topUI?.updateResponsiveLayout(isPortrait);
     
 
     const cardWidth = isPortrait
