@@ -40,31 +40,29 @@ export const LANDSCAPE = {
   BUY_FREE_Y: -380,
   BUY_FREE_SCALE: 0.65,
 
-  MENU_BTN_X: -930,
-  MENU_BTN_Y: 585,
-  MENU_BTN_SCALE: 0.6,
+  MENU_BTN_X: -900,
+  MENU_BTN_Y: 600,
+  MENU_BTN_SCALE: 0.7,
 
-  HUD_BAL_TITLE_X: -850,
+  HUD_BAL_TITLE_X: -820,
   HUD_BAL_TITLE_Y: 570,
-  HUD_BAL_BG_X: -870,
+  HUD_BAL_BG_X: -890,
   HUD_BAL_BG_Y: 600,
-  HUD_BAL_TEXT_X: -800,
+  HUD_BAL_TEXT_X: -820,
   HUD_BAL_TEXT_Y: 620,
   HUD_BAL_BG_SCALE: 0.8,
 
-  HUD_BET_TITLE_X: 550,
+  HUD_BET_TITLE_X: 680,
   HUD_BET_TITLE_Y: 570,
-  HUD_BET_BG_X: 530,
+  HUD_BET_BG_X: 600,
   HUD_BET_BG_Y: 600,
-  HUD_BET_TEXT_X: 590,
+  HUD_BET_TEXT_X: 680,
   HUD_BET_TEXT_Y: 615,
   HUD_BET_BG_SCALE: .8,
 
-  BTN_MINUS_X: 490,
-  BTN_MINUS_Y: 600,
-  BTN_PLUS_X: 905,
-  BTN_PLUS_Y: 600,
-  BTN_ADJUST_SCALE: 0.5,
+  BET_BTN_X: 600,
+  BET_BTN_Y: 600,
+  BET_BTN_SCALE: 0.7,
 
   HUD_WIN_TITLE_X: -25,
   HUD_WIN_TITLE_Y: 545,
@@ -95,8 +93,8 @@ export const LANDSCAPE = {
   TITLE_Y: 200,
   TITLE_SCALE: 0.7,
 
-  STATS_BTN_X: -1230,
-  STATS_BTN_Y: 550,
+  HISTORY_BTN_X: -1230,
+  HISTORY_BTN_Y: 550,
   TURBO_BTN_X: 1070,
   TURBO_BTN_Y: 520,
 
@@ -165,9 +163,9 @@ export const PORTRAIT = {
   BUY_FREE_Y: 1020, 
   BUY_FREE_SCALE: 0.715,
 
-  MENU_BTN_X: -850,
-  MENU_BTN_Y: 580,
-  MENU_BTN_SCALE: 0.8,
+  MENU_BTN_X: -840,
+  MENU_BTN_Y: 610,
+  MENU_BTN_SCALE: 0.7,
 
   HUD_BAL_TITLE_X: -835,
   HUD_BAL_TITLE_Y: 1440, 
@@ -179,7 +177,7 @@ export const PORTRAIT = {
 
 
 
-  HUD_BET_TITLE_X: 325,
+  HUD_BET_TITLE_X: 440,
   HUD_BET_TITLE_Y: 1440,
   HUD_BET_BG_X: 300,
   HUD_BET_BG_Y: 1480,
@@ -187,11 +185,9 @@ export const PORTRAIT = {
   HUD_BET_TEXT_Y: 1490,
   HUD_BET_BG_SCALE: 1,
 
-  BTN_MINUS_X: 180,
-  BTN_MINUS_Y: 1490,
-  BTN_PLUS_X: 810,
-  BTN_PLUS_Y: 1490,
-  BTN_ADJUST_SCALE: 0.7,
+  BET_BTN_X: 300,
+  BET_BTN_Y: 1470,
+  BET_BTN_SCALE: 0.8,
   
   HUD_WIN_TITLE_X: -120,
   HUD_WIN_TITLE_Y: 540,
@@ -210,9 +206,9 @@ export const PORTRAIT = {
   JACKPOT_MINI_Y: -920,
   JACKPOT_SCALE: 1,
 
-  MODEL_X: -350,
+  MODEL_X: -340,
   MODEL_Y: -1850,
-  MODEL_SCALE:2,
+  MODEL_SCALE:1.7,
 
 //   HAT_X: -1200,
 //   HAT_Y: -1850,
@@ -222,8 +218,8 @@ export const PORTRAIT = {
   TITLE_Y: -1550,
   TITLE_SCALE: 1.3,
 
-  STATS_BTN_X: 720,
-  STATS_BTN_Y: 550,
+  HISTORY_BTN_X: 720,
+  HISTORY_BTN_Y: 550,
   TURBO_BTN_X: -100,
   TURBO_BTN_Y: 1400,
 
@@ -292,10 +288,10 @@ const BET_VALUES_FROM_RULES: number[] = GAME_RULES.BET_SIZES.map(
 // Shared (orientation-independent)
 const SHARED = {
   REELS_COUNT: 5,
-  STATS_BTN_WIDTH: 200,
-  STATS_BTN_HEIGHT: 60,
-  STATS_BTN_RADIUS: 10,
-  STATS_BTN_FONT_SIZE: 40,
+  HISTORY_BTN_WIDTH: 200,
+  HISTORY_BTN_HEIGHT: 60,
+  HISTORY_BTN_RADIUS: 10,
+  HISTORY_BTN_FONT_SIZE: 40,
   TURBO_BTN_WIDTH: 160,
   TURBO_BTN_HEIGHT: 50,
   TURBO_BTN_RADIUS: 10,
@@ -319,9 +315,21 @@ const SHARED = {
   UI_JACKPOT_MINI_SIZE: 60,
   UI_JACKPOT_MAJOR_SIZE: 60,
   UI_JACKPOT_GRAND_SIZE: 60,
-  UI_TIER_WIN_SIZE: 300,
-  UI_TIER_WIN_LETTER_SPACING: 5,
-  UI_TIER_WIN_STROKE: 12,
+  
+  // UI_TIER_WIN_SIZE: 300,
+  // UI_TIER_WIN_LETTER_SPACING: 5,
+  // UI_TIER_WIN_STROKE: 12,
+  
+  UI_TIER_WIN_BITMAP_SIZE: 300,
+  UI_TIER_WIN_BITMAP_SCALE: 0.5,
+  UI_TIER_WIN_BITMAP_LETTER_SPACING: 0,
+  UI_TIER_WIN_BITMAP_COLORS: {
+    big:
+    0x29b6f6,
+    mega: 0xffc107,
+    max: 0xe91e63,
+    
+  },
   // UI Aesthetics
   HUD_VALUE_FILL: 0xffffff,
   HUD_VALUE_GLOW_COLOR: 0x00d9ff,
@@ -355,14 +363,14 @@ const SHARED = {
   WIN_HIGHLIGHT_DELAY: 0.3,
   SPIN_BTN_IDLE_SPEED: 8.0, 
   SPIN_BTN_SPIN_SPEED: 0.5, 
-  // Win tiers (total_win / bet)
+  // Win tiers 
   BIG_WIN_MULTIPLIER: 10,
   MEGA_WIN_MULTIPLIER: 30,
   MAX_WIN_MULTIPLIER: 100,
   /** Background glow color. */
   TIER_BG_GLOW: {
-    big: 0x29b6f6,
-    mega: 0xffc107,
+    big:0x29b6f6,
+    mega: 0xfbff00,
     max: 0xe91e63,
   } as const,
   /** Text fill color. */
@@ -394,6 +402,12 @@ const SHARED = {
   SLOT_OFFSET_Y_MOBILE_PORTRAIT: 50,
   SLOT_OFFSET_Y_TABLET_PORTRAIT: 250,
   SLOT_OFFSET_Y_DESKTOP_PORTRAIT: 150,
+  
+  // Coin VFX
+  UI_COIN_VFX_SCALE: .3,
+  UI_COIN_VFX_SPEED: .3,
+  UI_COIN_VFX_BURST_STRENGTH: 3,
+  UI_COIN_VFX_ZINDEX: 70,
 };
 
 /** Append form: DESIGN_WIDTH -> DESIGN_WIDTH_LANDSCAPE (used by slot, VFX, etc.) */
@@ -539,11 +553,22 @@ export const ASSETS = {
     "mini.png",
     "major.png",
     "minus.png",
+    "betBTN.png",
     "1.png",
     "vortex.png",
     "bet.png",
     "balance.png",
     "totalwin.png",
+    "bigwins.fnt",
+    "bigwin_0.png",
+    "bigwin_1.png",
+    "textbitmap.fnt",
+    "textbitmap.png",
+    "wintier.json",
+    "wintier.png",
+    "ammountbg.png",
+    "win_rays.png",
+    "coin.png"
   ],
   GIF: ["model1.gif"],
   VIDEO: ["redlight.mp4"],

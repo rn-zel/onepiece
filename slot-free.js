@@ -46,7 +46,7 @@ const CFG = {
 // DEBUG CONTROL
 
 const DEBUG_CONFIG = {
-    USE_CUSTOM_GRID: false, 
+    USE_CUSTOM_GRID: true, 
     LOG_CALCULATIONS: true,
     SHOWCASE_TIERS: true, 
 };

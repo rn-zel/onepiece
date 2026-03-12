@@ -6,6 +6,7 @@ import { type UIManager } from "../../presentation/ui/UIManager";
 import { type JackpotPresenter } from "../../presentation/ui/JackpotPresenter";
 import { CONFIG } from "../../domain/constants/Config";
 import { type AutoSpinConfig } from "../../presentation/ui/AutoSpinModal";
+import { TelemetryService } from "../../domain/services/TelemetryService";
 
 /**
  * Orchestrates the high-level game flow.
@@ -24,6 +25,7 @@ export class GameController {
   private isAutoSpinning: boolean = false;
   private autoSpinConfig: AutoSpinConfig | null = null;
   private sessionStartBalance: number = 0;
+  private telemetry = TelemetryService.getInstance();
 
   constructor(
     state: GameState,
@@ -95,6 +97,10 @@ export class GameController {
     return this.isAutoSpinning;
   }
 
+  public get spinning(): boolean {
+    return this.isSpinning;
+  }
+
   public async startAutoSpin(config: AutoSpinConfig) {
     if (this.isAutoSpinning) return;
 
@@ -116,10 +122,10 @@ export class GameController {
       this.autoSpinConfig.count--;
 
       // 4. Check stop conditions
-      if (this.autoSpinConfig.stopOnWin && this.state.totalWin > 0) {
-        this.stopAutoSpin();
-        break;
-      }
+      // if (this.autoSpinConfig.stopOnWin && this.state.totalWin > 0) {
+      //   this.stopAutoSpin();
+      //   break;
+      // }
 
       const sessionLoss = this.sessionStartBalance - this.state.balance;
       if (this.autoSpinConfig.stopOnLossLimit > 0 && sessionLoss >= this.autoSpinConfig.stopOnLossLimit) {
@@ -153,8 +159,9 @@ export class GameController {
     data: slotApi.BackendPlayData,
   ): Promise<void> {
     const grid = slotApi.backendReelToGrid(data.slot.reel);
+    this.telemetry.trackSpin(this.state.currentBet, data.total_win, data.is_free_spin);
 
-    // 1. Initial State Update (Trust balance from backend)
+    //Initial State Update (Trust balance from backend)
     const wasFreeSpin = this.state.freeSpinsCount > 0;
     this.state.balance = data.balance;
     this.state.freeSpinsCount = data.free_spin?.count ?? 0;
@@ -168,13 +175,13 @@ export class GameController {
         grid,
         !!data.free_spin?.count,
         async () => {
-          // 2. Handle Jackpots
+          //. Handle Jackpots
           if (data.jackpot_hit && data.jackpot_type) {
             const winAmount = data.jackpot_prizes?.[data.jackpot_type] || 0;
             await this.jackpotPresenter.show(data.jackpot_type, winAmount);
           }
 
-          // 3. Play Cascades
+          // Play Cascades
           if (data.slot.cascaded && data.slot.cascaded.length > 0) {
             await this.cascadeOrchestrator.play(
               data.slot.cascaded,
@@ -188,7 +195,7 @@ export class GameController {
             );
           }
 
-          // 4. Final Celebration & Summary
+          //  Final Celebration & Summary
           if (data.free_spin && (data.free_spin.add ?? 0) > 0) {
             // New trigger or re-trigger
             if (this.onBonusTriggered) {
@@ -207,7 +214,7 @@ export class GameController {
             // Completely suppress individual winText popups during active bonus spins
             this.ui.winText.text = "";
             
-            // If this was the absolute last free spin, show the final celebration
+            // If last free spin, show the final celebration
             if (this.state.freeSpinsCount === 0 && this.state.bonusSessionWin > 0) {
               const totalBonusWin = this.state.bonusSessionWin;
               const isBigWin = totalBonusWin >= this.state.currentBet * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
@@ -269,12 +276,16 @@ export class GameController {
   }
 
   public updateUI(): void {
+    const isFreeSpin = this.state.freeSpinsCount > 0;
+    const winToShow = isFreeSpin ? this.state.bonusSessionWin : this.state.totalWin;
+
     this.ui.updateTextValues(
       this.state.balance,
-      this.state.totalWin,
+      winToShow,
       this.state.freeSpinsCount,
+      isFreeSpin,
     );
     this.ui.updateBetTextDisplay(this.state.currentBet.toString());
-    this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0, this.isAutoSpinning);
+    this.ui.toggleButtonTheme(isFreeSpin, this.isAutoSpinning);
   }
 }

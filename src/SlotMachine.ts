@@ -40,6 +40,7 @@ export class SlotMachine {
   topUI: TopUI;
   modelUI: ModelUI;
   vfxManager!: VFXManager;
+  backParticleEmitter!: ParticleEmitter;
   soundManager: SoundManager = new SoundManager();
   particleEmitter!: ParticleEmitter;
   jackpotPresenter!: JackpotPresenter;
@@ -115,6 +116,11 @@ export class SlotMachine {
     );
     this.buyFreeSpinsModal = new BuyFreeSpinsModal(this.app.stage);
 
+    const backVFXContainer = new Container();
+    backVFXContainer.zIndex = CONFIG.UI_COIN_VFX_ZINDEX;
+    this.mainContainer.addChild(backVFXContainer);
+    this.backParticleEmitter = new ParticleEmitter(this.app, backVFXContainer);
+
     // 1. Create Orchestrators
     this.spinOrchestrator = new SpinOrchestrator(
       this.reels,
@@ -149,9 +155,9 @@ export class SlotMachine {
     this.uiManager = new UIManager(
       () => this.handleSpinClick(),
       () => this.openBuyFreeSpinsModal(),
-      (deltaIndex) => this.gameController.handleBetAdjust(deltaIndex),
       (cfg) => this.startManualAutoSpin(cfg),
       this.modalLayer,
+      this.backParticleEmitter
     );
 
     // 4. Circular Dependency Fix (Inject UI into orchestrators/controller)
@@ -214,6 +220,10 @@ export class SlotMachine {
       }
     });
 
+    window.addEventListener("slot-stop-auto", () => {
+      this.gameController.stopAutoSpin();
+    });
+
     this.waterBg.play();
 
     if (this.waterBg && this.waterBg.sprite) {
@@ -267,6 +277,7 @@ export class SlotMachine {
   }
 
   public openBuyFreeSpinsModal(): void {
+    if (this.gameController.spinning) return;
     if (this.vfxManager.isFreeSpinsTheme) return;
     this.soundManager.playSFX("sfx_button");
     const cost = this.gameState.currentBet * CONFIG.BUY_COST_MULTIPLIER;

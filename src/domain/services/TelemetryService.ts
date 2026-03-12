@@ -1,3 +1,10 @@
+export interface HistoryRecord {
+  timestamp: number;
+  bet: number;
+  win: number;
+  isBonus: boolean;
+}
+
 export class TelemetryService {
   private static instance: TelemetryService;
 
@@ -6,6 +13,7 @@ export class TelemetryService {
   private _spinsCount: number = 0;
   private _bonusSpinsCount: number = 0;
   private _sessionStartTime: number;
+  private _history: HistoryRecord[] = [];
 
   private constructor() {
     this._sessionStartTime = Date.now();
@@ -23,6 +31,19 @@ export class TelemetryService {
     this._totalWon += win;
     this._spinsCount++;
     if (isBonus) this._bonusSpinsCount++;
+
+    this._history.unshift({
+      timestamp: Date.now(),
+      bet,
+      win,
+      isBonus,
+    });
+
+    if (this._history.length > 50) this._history.pop();
+  }
+
+  public getHistory(): HistoryRecord[] {
+    return this._history;
   }
 
   public getRTP(): number {
@@ -46,6 +67,7 @@ export class TelemetryService {
     this._totalWon = 0;
     this._spinsCount = 0;
     this._bonusSpinsCount = 0;
+    this._history = [];
     this._sessionStartTime = Date.now();
   }
 }

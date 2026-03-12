@@ -6,6 +6,38 @@
     <title>Pixi Slot</title>
     <link rel="icon" href="data:,">
     <style>
+      :root {
+        --menu-sidebar-width: 80px;
+        --menu-sidebar-bg: #0f0e0d;
+        --menu-sidebar-padding: 16px;
+        --menu-sidebar-gap: 20px;
+        --menu-icon-btn-size: 60px;
+        --menu-icon-size: 28px;
+        --menu-panel-margin: 24px;
+        --menu-panel-bg: #1a1918;
+        --menu-panel-border-radius: 16px;
+        --menu-panel-border-color: rgba(186, 138, 76, 0.5);
+        --menu-header-padding: 20px;
+        --menu-title-font-size: 28px;
+        --menu-subtitle-bg: #252220;
+        --menu-subtitle-padding: 12px;
+        --menu-subtitle-font-size: 16px;
+        --menu-body-padding: 24px;
+        --menu-symbol-gap: 16px;
+        --menu-card-bg: #252220;
+        --menu-card-padding: 14px;
+        --menu-symbol-image-size: 64px;
+        --menu-footer-padding: 14px;
+        --menu-footer-font-size: 13px;
+        --menu-accent-color: #d4af37;
+        
+        --bet-sheet-max-height: 25%;
+        --bet-title-size: 36px;
+        --bet-meta-size: 18px;
+        --bet-amount-size: 32px;
+        --bet-subline-size: 14px;
+      }
+
       body, html {
         margin: 0;
         padding: 0;
@@ -28,6 +60,8 @@
       }
       canvas {
         object-fit: contain;
+        width: 100% !important;
+        height: 100% !important;
       }
 
       /* Menu overlay */
@@ -112,7 +146,7 @@
       }
       .symbol-grid {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(var(--menu-grid-cols, 2), 1fr);
         gap: var(--menu-symbol-gap, 16px);
       }
       .symbol-card {
@@ -262,8 +296,8 @@
       #bet-overlay.open { display: flex; }
       .bet-sheet {
         width: 100%;
-        height: 100%;
-        max-height: 25%;
+        height: auto;
+        max-height: var(--bet-sheet-max-height, 25%);
         max-width: 2300px;
         margin: 0;
         background: #2a2a2a;
@@ -272,8 +306,9 @@
         border-right: 0;
         border-bottom: 0;
         border-radius: 0;
-        overflow: hidden;
+        overflow-y: auto;
         box-shadow: 0 -20px 60px rgba(0,0,0,0.55);
+        padding-bottom: env(safe-area-inset-bottom, 10px);
       }
       .bet-sheet-header {
         position: relative;
@@ -285,12 +320,13 @@
         border-bottom: 1px solid rgba(255,255,255,0.08);
       }
       .bet-sheet-title {
-        font-size: 36px;
+        font-size: var(--bet-title-size, 36px);
         font-weight: 800;
         color: #e8e6e3;
+        line-height: 1.1;
       }
       .bet-sheet-meta {
-        font-size: 18px;
+        font-size: var(--bet-meta-size, 18px);
         color: #d4af37;
         font-weight: 700;
       }
@@ -330,12 +366,12 @@
       .bet-topline .right { min-width: 220px; font-size: 12px; color: #d4af37; font-weight: 700; }
       .bet-topline .center { flex: 1; text-align: center; }
       .bet-topline .center .amount {
-        font-size: 14px;
+        font-size: var(--bet-amount-size, 24px);
         font-weight: 900;
         color: #ffffff;
       }
       .bet-topline .center .sub {
-        font-size: 11px;
+        font-size: var(--bet-subline-size, 11px);
         color: #bdbab6;
         margin-top: 2px;
       }
@@ -406,6 +442,79 @@
         background: #d4af37;
         border-color: rgba(0,0,0,0.25);
         color: #1a1918;
+      }
+      /* Responsive Adjustments */
+      @media (max-width: 900px) {
+        :root {
+          --menu-grid-cols: 1;
+        }
+      }
+
+      @media (max-width: 600px), (orientation: portrait) {
+        :root {
+          --menu-sidebar-width: 100%;
+          --menu-sidebar-padding: 8px 16px;
+          --menu-sidebar-gap: 12px;
+          --menu-panel-margin: 0;
+          --menu-panel-border-radius: 0;
+          --menu-panel-border-color: transparent;
+          --menu-header-padding: 16px;
+          --menu-title-font-size: 22px;
+          --menu-subtitle-font-size: 14px;
+          --menu-body-padding: 16px;
+          --menu-grid-cols: 1;
+
+          --bet-sheet-max-height: 50%;
+          --bet-title-size: 28px;
+          --bet-meta-size: 15px;
+          --bet-amount-size: 18px;
+          --bet-subline-size: 12px;
+        }
+
+        #menu-overlay {
+          flex-direction: column;
+        }
+
+        .menu-sidebar {
+          flex-direction: row;
+          width: 100%;
+          min-width: 100%;
+          height: auto;
+          order: 2; /* Sidebar at bottom for easier mobile thumb reach */
+          justify-content: space-around;
+          border-top: 1px solid rgba(186, 138, 76, 0.3);
+        }
+
+        .menu-sidebar .icon-btn {
+          width: 44px;
+          height: 44px;
+        }
+
+        .menu-panel {
+          margin: 0;
+          border-width: 0 0 1px 0;
+          height: 100%;
+          max-height: none;
+        }
+
+        .bet-topline {
+          flex-direction: column;
+          gap: 10px;
+          text-align: center;
+        }
+        
+        .bet-topline .left, .bet-topline .right {
+          display: none; /* Hide helper text on small screens to save space */
+        }
+        
+        .bet-sheet-header {
+          padding: 12px 16px;
+        }
+
+        .bet-step {
+          width: 50px;
+          height: 40px;
+        }
       }
     </style>
   </head>

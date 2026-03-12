@@ -56,7 +56,7 @@ export class HelpModal {
     overlay.on("pointerdown", () => {}); // block clicks
     this.modalContainer.addChild(overlay);
 
-    // Main Panel (same size as StatsModal)
+    // Main Panel (same size as HistoryModal)
     const panel = new Graphics()
       .roundRect(
         -PANEL_WIDTH / 2,

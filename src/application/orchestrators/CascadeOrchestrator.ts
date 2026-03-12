@@ -70,7 +70,7 @@ export class CascadeOrchestrator {
   async play(
     cascaded: BackendCascadeStep[],
     initialWin: number,
-    betAmount: number,
+    _betAmount: number,
     onStep: (accumulatedWin: number) => void,
   ): Promise<void> {
     this.reels.forEach((r) =>
@@ -156,14 +156,14 @@ export class CascadeOrchestrator {
 
       this._spawnWinChip(winningPositions, stepPayout, step.multiplier);
 
-      const isBigWin = stepPayout >= betAmount;
-      gsap.delayedCall(0, () => {
-        this.particleEmitter.burst(
-          CONFIG.PARTICLE_ORIGIN_X,
-          CONFIG.PARTICLE_ORIGIN_Y,
-          isBigWin ? 100 : 30,
-        );
-      });
+      // const isBigWin = stepPayout >= betAmount;
+      // gsap.delayedCall(0, () => {
+      //   this.particleEmitter.burst(
+      //     CONFIG.PARTICLE_ORIGIN_X,
+      //     CONFIG.PARTICLE_ORIGIN_Y,
+      //     isBigWin ? 100 : 30,
+      //   );
+      // });
 
       const currentDelay =
         stepIndex === 0 ? CONFIG.FIRST_WIN_DELAY : CONFIG.CASCADE_WIN_DELAY;

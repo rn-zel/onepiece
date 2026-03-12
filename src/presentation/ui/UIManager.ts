@@ -1,11 +1,12 @@
 import { Container, Sprite, Text, TextStyle, Assets, Graphics } from "pixi.js";
+import { ParticleEmitter } from "../vfx/ParticleEmitter";
 import {
   CONFIG,
   DEVICE_TYPES,
   type DeviceType,
 } from "../../domain/constants/Config";
 import { HelpModal } from "./HelpModal";
-import { StatsModal } from "./StatsModal";
+import { HistoryModal } from "./HistoryModal";
 import { AutoSpinModal, type AutoSpinConfig } from "./AutoSpinModal";
 import { WinPresenter } from "./WinPresenter";
 
@@ -16,9 +17,8 @@ export class UIManager {
   autoSpinButton!: Sprite;
   buyFreeSpinButton!: Sprite;
   menuButton!: Sprite;
-  minusButton!: Sprite;
-  plusButton!: Sprite;
-  statsButton!: Container;
+  betButton!: Sprite;
+  historyButton!: Container;
 
   winText!: Text;
   balanceText!: Text;
@@ -35,7 +35,7 @@ export class UIManager {
   private winBg!: Sprite;
   private turboButton!: Container;
   private isTurboActive: boolean = false;
-  private statsModal!: StatsModal;
+  private historyModal!: HistoryModal;
   private autoSpinModal!: AutoSpinModal;
 
   private helpModal!: HelpModal;
@@ -43,39 +43,36 @@ export class UIManager {
 
   private onSpin: () => void;
   private onBuyFreeSpins: () => void;
-  private onBetAdjust: (delta: -1 | 1) => void;
   private onAutoSpinStart: (config: AutoSpinConfig) => void;
 
   constructor(
     onSpin: () => void,
     onBuyFreeSpins: () => void,
-    onBetAdjust: (delta: -1 | 1) => void,
     onAutoSpinStart: (config: AutoSpinConfig) => void,
     modalLayer: Container,
+    backParticleEmitter: ParticleEmitter
   ) {
     this.onSpin = onSpin;
     this.onBuyFreeSpins = onBuyFreeSpins;
-    this.onBetAdjust = onBetAdjust;
     this.onAutoSpinStart = onAutoSpinStart;
     this.createUI();
 
     this.container.sortableChildren = true;
 
-    if (this.minusButton) this.minusButton.zIndex = 5;
-    if (this.plusButton) this.plusButton.zIndex = 5;
     if (this.menuButton) this.menuButton.zIndex = 5;
+    if (this.betButton) this.betButton.zIndex = 5;
 
     if (this.spinButton) this.spinButton.zIndex = 20;
     if (this.autoSpinButton) this.autoSpinButton.zIndex = 20;
     if (this.buyFreeSpinButton) this.buyFreeSpinButton.zIndex = 20;
 
     this.helpModal = new HelpModal(modalLayer);
-    this.statsModal = new StatsModal(modalLayer);
+    this.historyModal = new HistoryModal(modalLayer);
     this.autoSpinModal = new AutoSpinModal(modalLayer, (cfg) =>
       this.onAutoSpinStart(cfg),
     );
 
-    this.winPresenter = new WinPresenter(this);
+    this.winPresenter = new WinPresenter(this, backParticleEmitter);
     this.winPresenter.init();
   }
 
@@ -138,7 +135,14 @@ export class UIManager {
     this.autoSpinButton.y = CONFIG.AUTO_BTN_LANDSCAPE_Y;
     this.autoSpinButton.interactive = true;
     this.autoSpinButton.cursor = "pointer";
-    this.autoSpinButton.on("pointerdown", () => this.autoSpinModal.show());
+    this.autoSpinButton.on("pointerdown", () => {
+      if (this.autoSpinButton.tint !== CONFIG.UI_COLORS.DEFAULT_TINT && this.autoSpinButton.tint !== CONFIG.UI_COLORS.FREE_SPINS_TINT) {
+         // Auto spin is active, stop it
+         window.dispatchEvent(new CustomEvent("slot-stop-auto"));
+      } else {
+         this.autoSpinModal.show();
+      }
+    });
     this.container.addChild(this.autoSpinButton);
 
     // Menu Button
@@ -154,44 +158,44 @@ export class UIManager {
     });
     this.container.addChild(this.menuButton);
 
-    this.statsButton = new Container();
+    this.historyButton = new Container();
     const statBg = new Graphics()
       .roundRect(
         0,
         0,
-        CONFIG.STATS_BTN_WIDTH,
-        CONFIG.STATS_BTN_HEIGHT,
-        CONFIG.STATS_BTN_RADIUS,
+        CONFIG.HISTORY_BTN_WIDTH,
+        CONFIG.HISTORY_BTN_HEIGHT,
+        CONFIG.HISTORY_BTN_RADIUS,
       )
       .fill({ color: 0x1a1a1a, alpha: 0.85 })
       .stroke({ color: 0xba8a4c, width: 2, alpha: 0.8 });
 
     const statTxt = new Text({
-      text: "STATS",
+      text: "HISTORY",
       style: {
         fill: "#BA8A4C",
-        fontSize: CONFIG.STATS_BTN_FONT_SIZE,
+        fontSize: CONFIG.HISTORY_BTN_FONT_SIZE,
         fontWeight: "900",
         dropShadow: { color: 0x000000, blur: 2, distance: 1 },
       },
     });
     statTxt.anchor.set(0.5);
     statTxt.position.set(
-      CONFIG.STATS_BTN_WIDTH / 2,
-      CONFIG.STATS_BTN_HEIGHT / 2,
+      CONFIG.HISTORY_BTN_WIDTH / 2,
+      CONFIG.HISTORY_BTN_HEIGHT / 2,
     );
-    this.statsButton.addChild(statBg, statTxt);
-    this.statsButton.eventMode = "static";
-    this.statsButton.cursor = "pointer";
-    this.statsButton.on("pointerdown", () => {
+    this.historyButton.addChild(statBg, statTxt);
+    this.historyButton.eventMode = "static";
+    this.historyButton.cursor = "pointer";
+    this.historyButton.on("pointerdown", () => {
       gsap.fromTo(
-        this.statsButton.scale,
+        this.historyButton.scale,
         { x: 0.9, y: 0.9 },
         { x: 1, y: 1, duration: 0.1 },
       );
-      this.statsModal.show();
+      this.historyModal.show();
     });
-    this.container.addChild(this.statsButton);
+    this.container.addChild(this.historyButton);
 
     // BALANCE
     this.balanceTitle = new Text({ text: "CREDIT", style: titleStyle });
@@ -276,29 +280,25 @@ export class UIManager {
     this.totalWinText.y = CONFIG.HUD_WIN_TEXT_LANDSCAPE_Y;
     this.container.addChild(this.totalWinText);
 
-    // MINUS BUTTON
-    this.minusButton = new Sprite(Assets.get("minus.png"));
-    this.minusButton.anchor.set(0.5);
-    this.minusButton.scale.set(CONFIG.BTN_ADJUST_LANDSCAPE_SCALE);
-    this.minusButton.x = CONFIG.BTN_MINUS_LANDSCAPE_X;
-    this.minusButton.y = CONFIG.BTN_MINUS_LANDSCAPE_Y;
-    this.minusButton.interactive = true;
-    this.minusButton.eventMode = "static";
-    this.minusButton.cursor = "pointer";
-    this.minusButton.on("pointerdown", () => this.onBetAdjust(-1));
-    this.container.addChild(this.minusButton);
-
-    // PLUS BUTTON
-    this.plusButton = new Sprite(Assets.get("plus.png"));
-    this.plusButton.anchor.set(0.5);
-    this.plusButton.scale.set(CONFIG.BTN_ADJUST_LANDSCAPE_SCALE);
-    this.plusButton.x = CONFIG.BTN_PLUS_LANDSCAPE_X;
-    this.plusButton.y = CONFIG.BTN_PLUS_LANDSCAPE_Y;
-    this.plusButton.interactive = true;
-    this.plusButton.eventMode = "static";
-    this.plusButton.cursor = "pointer";
-    this.plusButton.on("pointerdown", () => this.onBetAdjust(1));
-    this.container.addChild(this.plusButton);
+    // BET BUTTON
+    this.betButton = new Sprite(Assets.get("betBTN.png"));
+    this.betButton.anchor.set(0.5);
+    this.betButton.scale.set(CONFIG.BET_BTN_LANDSCAPE_SCALE);
+    this.betButton.x = CONFIG.BET_BTN_LANDSCAPE_X;
+    this.betButton.y = CONFIG.BET_BTN_LANDSCAPE_Y;
+    this.betButton.interactive = true;
+    this.betButton.eventMode = "static";
+    this.betButton.cursor = "pointer";
+    this.betButton.on("pointerdown", () => {
+      const balance = parseFloat(this.balanceText.text.replace(/[^0-9.]/g, ""));
+      const currentBet = parseFloat(
+        this.betAmountText.text.replace(/[^0-9.]/g, ""),
+      );
+      window.dispatchEvent(
+        new CustomEvent("slot-open-bet", { detail: { balance, currentBet } }),
+      );
+    });
+    this.container.addChild(this.betButton);
 
     // WIN TEX
     this.winText = new Text({
@@ -406,8 +406,8 @@ export class UIManager {
     this.betAmountText.style.fontSize = newSize;
   }
 
-  public showStats() {
-    this.statsModal.show();
+  public showHistory() {
+    this.historyModal.show();
   }
 
   //  updateBalance, Total Win, Free Spins
@@ -441,22 +441,23 @@ export class UIManager {
       : CONFIG.UI_COLORS.DEFAULT_TINT;
 
     if (this.spinButton) {
-      this.spinButton.tint = isAuto ? 0xff0000 : tintColor;
+      this.spinButton.tint = tintColor;
     }
-    if (this.autoSpinButton) this.autoSpinButton.tint = tintColor;
+    if (this.autoSpinButton) {
+      this.autoSpinButton.tint = isAuto ? 0x00ff00 : tintColor; // Green when active
+    }
     if (this.buyFreeSpinButton) this.buyFreeSpinButton.tint = tintColor;
-    if (this.minusButton) this.minusButton.tint = tintColor;
-    if (this.plusButton) this.plusButton.tint = tintColor;
+    if (this.betButton) this.betButton.tint = tintColor;
     if (this.menuButton) this.menuButton.tint = tintColor;
 
-    if (isFreeSpins || isAuto) {
+    if (isFreeSpins) {
       this.autoSpinButton.visible = false;
       this.buyFreeSpinButton.visible = false;
       this.betAmountText.eventMode = "none";
     } else {
       this.autoSpinButton.visible = true;
       this.buyFreeSpinButton.visible = true;
-      this.betAmountText.eventMode = "static";
+      this.betAmountText.eventMode = isAuto ? "none" : "static";
     }
   }
 
@@ -468,7 +469,7 @@ export class UIManager {
     const duration = 1.0;
 
     // 1. Animate visibility of mode buttons
-    if (toFreeSpins || isAuto) {
+    if (toFreeSpins) {
       gsap.to([this.autoSpinButton, this.buyFreeSpinButton], {
         alpha: 0,
         duration: 0.5,
@@ -485,7 +486,7 @@ export class UIManager {
         alpha: 1,
         duration: 0.5,
       });
-      this.betAmountText.eventMode = "static";
+      this.betAmountText.eventMode = isAuto ? "none" : "static";
     }
 
     // 2. Animate tints
@@ -493,11 +494,8 @@ export class UIManager {
       this.spinButton,
       this.autoSpinButton,
       this.buyFreeSpinButton,
-      this.minusButton,
-      this.plusButton,
-      this.menuButton,
-      this.balanceBg,
       this.betBg,
+      this.betButton,
       this.winBg,
     ];
 
@@ -514,7 +512,7 @@ export class UIManager {
 
   public handleResize(width: number, height: number) {
     this.autoSpinModal?.handleResize(width, height);
-    this.statsModal?.handleResize(width, height);
+    this.historyModal?.handleResize(width, height);
     this.helpModal?.handleResize(width, height);
   }
 
@@ -568,15 +566,10 @@ export class UIManager {
       this.betAmountText.x = CONFIG.HUD_BET_TEXT_PORTRAIT_X;
       this.betAmountText.y = CONFIG.HUD_BET_TEXT_PORTRAIT_Y;
 
-      this.minusButton.x = CONFIG.BTN_MINUS_PORTRAIT_X;
-      this.minusButton.y = CONFIG.BTN_MINUS_PORTRAIT_Y;
-      this.minusButton.scale.set(
-        CONFIG.BTN_ADJUST_PORTRAIT_SCALE * mobileScaleBonus,
-      );
-      this.plusButton.x = CONFIG.BTN_PLUS_PORTRAIT_X;
-      this.plusButton.y = CONFIG.BTN_PLUS_PORTRAIT_Y;
-      this.plusButton.scale.set(
-        CONFIG.BTN_ADJUST_PORTRAIT_SCALE * mobileScaleBonus,
+      this.betButton.x = CONFIG.BET_BTN_PORTRAIT_X;
+      this.betButton.y = CONFIG.BET_BTN_PORTRAIT_Y;
+      this.betButton.scale.set(
+        CONFIG.BET_BTN_PORTRAIT_SCALE * mobileScaleBonus,
       );
 
       // Total Win center
@@ -590,8 +583,8 @@ export class UIManager {
 
       this.winText.y = CONFIG.WIN_TEXT_PORTRAIT_Y;
 
-      this.statsButton.x = CONFIG.STATS_BTN_PORTRAIT_X;
-      this.statsButton.y = CONFIG.STATS_BTN_PORTRAIT_Y;
+      this.historyButton.x = CONFIG.HISTORY_BTN_PORTRAIT_X;
+      this.historyButton.y = CONFIG.HISTORY_BTN_PORTRAIT_Y;
 
       this.turboButton.x = CONFIG.TURBO_BTN_PORTRAIT_X;
       this.turboButton.y = CONFIG.TURBO_BTN_PORTRAIT_Y;
@@ -635,15 +628,10 @@ export class UIManager {
       this.betAmountText.x = CONFIG.HUD_BET_TEXT_LANDSCAPE_X;
       this.betAmountText.y = CONFIG.HUD_BET_TEXT_LANDSCAPE_Y;
 
-      this.minusButton.x = CONFIG.BTN_MINUS_LANDSCAPE_X;
-      this.minusButton.y = CONFIG.BTN_MINUS_LANDSCAPE_Y;
-      this.minusButton.scale.set(
-        CONFIG.BTN_ADJUST_LANDSCAPE_SCALE * mobileScaleBonus,
-      );
-      this.plusButton.x = CONFIG.BTN_PLUS_LANDSCAPE_X;
-      this.plusButton.y = CONFIG.BTN_PLUS_LANDSCAPE_Y;
-      this.plusButton.scale.set(
-        CONFIG.BTN_ADJUST_LANDSCAPE_SCALE * mobileScaleBonus,
+      this.betButton.x = CONFIG.BET_BTN_LANDSCAPE_X;
+      this.betButton.y = CONFIG.BET_BTN_LANDSCAPE_Y;
+      this.betButton.scale.set(
+        CONFIG.BET_BTN_LANDSCAPE_SCALE * mobileScaleBonus,
       );
 
       this.totalWinTitle.x = CONFIG.HUD_WIN_TITLE_LANDSCAPE_X;
@@ -656,8 +644,8 @@ export class UIManager {
 
       this.winText.y = CONFIG.WIN_TEXT_LANDSCAPE_Y;
 
-      this.statsButton.x = CONFIG.STATS_BTN_LANDSCAPE_X;
-      this.statsButton.y = CONFIG.STATS_BTN_LANDSCAPE_Y;
+      this.historyButton.x = CONFIG.HISTORY_BTN_LANDSCAPE_X;
+      this.historyButton.y = CONFIG.HISTORY_BTN_LANDSCAPE_Y;
 
       this.turboButton.x = CONFIG.TURBO_BTN_LANDSCAPE_X;
       this.turboButton.y = CONFIG.TURBO_BTN_LANDSCAPE_Y;

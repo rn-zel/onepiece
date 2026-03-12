@@ -1,4 +1,4 @@
-import { Container, Graphics, TextStyle } from "pixi.js";
+import { Container, Graphics, TextStyle, BitmapText, Sprite, Texture, Assets } from "pixi.js";
 import gsap from "gsap";
 import { CONFIG } from "../../domain/constants/Config";
 import type { UIManager } from "./UIManager";
@@ -11,14 +11,22 @@ export class WinPresenter {
   private bonusPanel!: Container;
   private tierPanel!: Container;
   private tierGlowBg!: Graphics;
+  private lightRaySprite!: Sprite;
+  private tierLabelSprite!: Sprite;
+  private amountPanel!: Container;
+  private amountBgSprite!: Sprite;
+  private amountText!: BitmapText;
   private uiManager: UIManager;
+  private backParticleEmitter: any; // Type 'any' to avoid circular dependency issues if they arise, or use ParticleEmitter type
 
   private _currentTierValue: number = 0;
   private _tierTween: gsap.core.Tween | null = null;
   private _activeTierLabel: string = "";
+  private _coinShowerInterval: any = null;
 
-  constructor(uiManager: UIManager) {
+  constructor(uiManager: UIManager, backParticleEmitter: any) {
     this.uiManager = uiManager;
+    this.backParticleEmitter = backParticleEmitter;
   }
 
   init(): void {
@@ -104,6 +112,15 @@ export class WinPresenter {
       this._tierTween = null;
     }
 
+    if (this._coinShowerInterval) {
+      this.backParticleEmitter.stopContinuousBurst(this._coinShowerInterval);
+      this._coinShowerInterval = null;
+    }
+
+    if (this.lightRaySprite) {
+      gsap.killTweensOf(this.lightRaySprite);
+    }
+
     for (const panel of panels) {
       gsap.killTweensOf(panel);
       gsap.killTweensOf(panel.scale);
@@ -114,6 +131,10 @@ export class WinPresenter {
         onComplete: () => {
           panel.visible = false;
           panel.scale.set(1);
+          if (panel === this.tierPanel) {
+            if (this.tierLabelSprite) this.tierLabelSprite.visible = false;
+            if (this.amountPanel) this.amountPanel.visible = false;
+          }
         },
       });
     }
@@ -139,6 +160,15 @@ export class WinPresenter {
       this.tierPanel.scale.set(0.9);
 
       this._setTierVisuals("big", 0);
+      this.uiManager.winText.visible = false; 
+
+      // Trigger continuous coin explosion behind reels
+      if (this.backParticleEmitter) {
+        if (this._coinShowerInterval) {
+          this.backParticleEmitter.stopContinuousBurst(this._coinShowerInterval);
+        }
+        this._coinShowerInterval = this.backParticleEmitter.startContinuousCoinBurst(0, 0);
+      }
 
       gsap.killTweensOf(this.tierPanel);
       gsap.killTweensOf(this.tierPanel.scale);
@@ -188,7 +218,12 @@ export class WinPresenter {
             ease: "power2.out",
             onUpdate: () => {
               this._currentTierValue = Math.floor(counterObj.val);
-              this.uiManager.winText.text = `${this._activeTierLabel}\n₱${this._currentTierValue.toLocaleString()}`;
+              const formattedValue = this._currentTierValue.toLocaleString();
+              if (this.tierLabelSprite) {
+                this.amountText.text = formattedValue;
+              } else {
+                this.uiManager.winText.text = `${this._activeTierLabel}\n₱${formattedValue}`;
+              }
             },
             onComplete: resolve,
           });
@@ -205,7 +240,12 @@ export class WinPresenter {
     }
 
     // Lock in the final exact text value
-    this.uiManager.winText.text = `${this._activeTierLabel}\n₱${Math.floor(totalWin).toLocaleString()}`;
+    const finalFormattedValue = Math.floor(totalWin).toLocaleString();
+    if (this.tierLabelSprite) {
+        this.amountText.text = finalFormattedValue;
+    } else {
+        this.uiManager.winText.text = `${this._activeTierLabel}\n₱${finalFormattedValue}`;
+    }
 
     // Wait  end before hiding
     await new Promise<void>((resolve) => gsap.delayedCall(2.5, resolve));
@@ -222,20 +262,49 @@ export class WinPresenter {
       tier === "max" ? "MAX WIN" : tier === "mega" ? "MEGA WIN" : "BIG WIN";
 
     this._activeTierLabel = newLabel;
-    this._applyTierWinTextStyle(tier);
 
     const glowColor = (CONFIG as any).TIER_BG_GLOW?.[tier] ?? 0xffc107;
     this._drawTierGlow(glowColor);
 
+    if (this.lightRaySprite) {
+      gsap.killTweensOf(this.lightRaySprite);
+      
+      this.lightRaySprite.tint = (CONFIG as any).UI_TIER_WIN_BITMAP_COLORS?.[tier] ?? 0xffffff;
+      this.lightRaySprite.visible = true;
+      this.lightRaySprite.alpha = 0;
+      this.lightRaySprite.rotation = 0;
+      
+      gsap.to(this.lightRaySprite, { alpha: .3, duration: 0.8 });
+      
+      gsap.to(this.lightRaySprite, {
+        rotation: Math.PI * 2,
+        duration: 30,
+        repeat: -1,
+        ease: "none"
+      });
+    }
+
     // Heavy, lingering elastic bounce
-    gsap.killTweensOf(this.uiManager.winText.scale);
+    const bounceTarget = this.tierLabelSprite || this.uiManager.winText;
+    gsap.killTweensOf(bounceTarget.scale);
+    const finalScale = CONFIG.UI_TIER_WIN_BITMAP_SCALE || 0.35;
     gsap.fromTo(
-      this.uiManager.winText.scale,
-      { x: 1.6, y: 1.6 },
-      { x: 1, y: 1, duration: 1.5, ease: "elastic.out(1, 0.3)" },
+      bounceTarget.scale,
+      { x: finalScale * 1.6, y: finalScale * 1.6 },
+      { x: finalScale, y: finalScale, duration: 1.5, ease: "elastic.out(1, 0.3)" },
     );
 
-    this.uiManager.winText.text = `${this._activeTierLabel}\n₱${currentValue.toLocaleString()}`;
+    const formattedValue = currentValue.toLocaleString();
+    if (this.tierLabelSprite) {
+        // Update label texture from sprite sheet
+        const frameName = `${tier}.png`;
+        this.tierLabelSprite.texture = Texture.from(frameName);
+        this.amountText.text = formattedValue;
+        this.tierLabelSprite.visible = true;
+        this.amountPanel.visible = true;
+    } else {
+        this.uiManager.winText.text = `${this._activeTierLabel}\n₱${formattedValue}`;
+    }
   }
 
   private _adoptText(panel: Container): void {
@@ -258,36 +327,37 @@ export class WinPresenter {
     });
     this.uiManager.winText.style = style;
     this.uiManager.winText.scale.set(1);
+    this.uiManager.winText.visible = true;
   }
 
-  private _applyTierWinTextStyle(tier: "big" | "mega" | "max" = "big"): void {
-    const fillColors = (CONFIG as any).TIER_TEXT_FILL?.[tier]
-      ? [
-          (CONFIG as any).TIER_TEXT_FILL[tier],
-          0xffffff,
-          (CONFIG as any).TIER_TEXT_FILL[tier],
-        ]
-      : [0xffffff, 0xfbff00, 0xffc800];
+  // private _applyTierWinTextStyle(tier: "big" | "mega" | "max" = "big"): void {
+  //   const fillColors = (CONFIG as any).TIER_TEXT_FILL?.[tier]
+  //     ? [
+  //         (CONFIG as any).TIER_TEXT_FILL[tier],
+  //         0xffffff,
+  //         (CONFIG as any).TIER_TEXT_FILL[tier],
+  //       ]
+  //     : [0xffffff, 0xfbff00, 0xffc800];
 
-    const style = new TextStyle({
-      fontFamily: "Georgia, serif",
-      fontSize: CONFIG.UI_TIER_WIN_SIZE,
-      fontWeight: "900",
-      align: "center",
-      letterSpacing: CONFIG.UI_TIER_WIN_LETTER_SPACING,
-      padding: 20,
-      fill: fillColors,
-      stroke: { color: 0x000000, width: CONFIG.UI_TIER_WIN_STROKE, join: "round" },
-      dropShadow: {
-        color: 0x000000,
-        blur: 4,
-        distance: 8,
-        angle: Math.PI / 4,
-        alpha: 0.8,
-      },
-    });
-    this.uiManager.winText.style = style;
-  }
+  //   const style = new TextStyle({
+  //     fontFamily: "Georgia, serif",
+  //     fontSize: CONFIG.UI_TIER_WIN_SIZE,
+  //     fontWeight: "900",
+  //     align: "center",
+  //     letterSpacing: CONFIG.UI_TIER_WIN_LETTER_SPACING,
+  //     padding: 20,
+  //     fill: fillColors,
+  //     stroke: { color: 0x000000, width: CONFIG.UI_TIER_WIN_STROKE, join: "round" },
+  //     dropShadow: {
+  //       color: 0x000000,
+  //       blur: 4,
+  //       distance: 8,
+  //       angle: Math.PI / 4,
+  //       alpha: 0.8,
+  //     },
+  //   });
+  //   this.uiManager.winText.style = style;
+  // }
 
   private _drawTierGlow(color: number): void {
     if (!this.tierGlowBg) return;
@@ -374,10 +444,60 @@ export class WinPresenter {
     this.tierPanel.position.copyFrom(this.winPanel.position);
     this.tierPanel.visible = false;
     this.tierPanel.alpha = 0;
+    this.tierPanel.sortableChildren = true;
 
     this.tierGlowBg = new Graphics();
     this.tierPanel.addChild(this.tierGlowBg);
 
+    // Create rotating rays
+    const rayTex = Assets.get("win_rays.png");
+    if (rayTex) {
+      this.lightRaySprite = new Sprite(rayTex);
+    } else {
+      // Fallback if not ready
+      this.lightRaySprite = Sprite.from("win_rays.png");
+    }
+    
+    this.lightRaySprite.anchor.set(0.5);
+    this.lightRaySprite.scale.set(1);  
+    this.lightRaySprite.zIndex = -1;      
+    this.lightRaySprite.y = -220;       
+    this.lightRaySprite.blendMode = "add"; 
+    this.tierPanel.addChild(this.lightRaySprite);
+
+    // Create label sprite 
+    this.tierLabelSprite = new Sprite();
+    this.tierLabelSprite.anchor.set(0.5);
+    this.tierLabelSprite.zIndex = 10;
+    this.tierLabelSprite.y = -220; 
+    this.tierLabelSprite.scale.set(CONFIG.UI_TIER_WIN_BITMAP_SCALE || 0.15); 
+    this.tierPanel.addChild(this.tierLabelSprite);
+
+    // Create styled amount panel
+    this.amountPanel = new Container();
+    this.amountPanel.y = 150; 
+    this.tierPanel.addChild(this.amountPanel);
+
+    // Background sprite 
+    this.amountBgSprite = Sprite.from("ammountbg.png");
+    this.amountBgSprite.anchor.set(0.5);
+    this.amountBgSprite.scale.set(.3);
+    this.amountPanel.addChild(this.amountBgSprite);
+
+    this.amountText = new BitmapText({
+      text: "0",
+      style: {
+        fontFamily: "Araside",
+        fontSize: 100, 
+        align: "center",
+      },
+    });
+    this.amountText.anchor.set(0.5);
+    this.amountText.y = -10;
+    this.amountPanel.addChild(this.amountText);
+
     parent.addChild(this.tierPanel);
   }
+
+  
 }

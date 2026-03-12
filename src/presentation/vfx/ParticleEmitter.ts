@@ -1,10 +1,12 @@
-import { Application, Container, Graphics, Sprite, Texture } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Texture, Assets } from "pixi.js";
 import { gsap } from "gsap";
+import { CONFIG } from "../../domain/constants/Config";
 
 export class ParticleEmitter {
   app: Application;
   container: Container;
   coinTexture: Texture;
+  realCoinTexture: Texture;
   glowTexture: Texture;
   dustTexture: Texture;
 
@@ -12,6 +14,7 @@ export class ParticleEmitter {
     this.app = app;
     this.container = container;
     this.coinTexture = this.createCoinTexture();
+    this.realCoinTexture = Assets.get("coin.png") || this.coinTexture;
     this.glowTexture = this.createGlowTexture();
     this.dustTexture = this.createDustTexture();
   }
@@ -49,33 +52,57 @@ export class ParticleEmitter {
   }
 
   public burst(x: number, y: number, count: number = 60) {
-    for (let i = 0; i < count; i++) {
-      const coin = new Sprite(this.coinTexture);
-      coin.anchor.set(0.5);
+    this._burstInternal(x, y, count, this.coinTexture);
+  }
 
-      // Randomly scale coins to give depth depth
-      const baseScale = Math.random() * 0.5 + 1;
+  public coinBurst(x: number, y: number, count: number = 80) {
+    this._burstInternal(x, y, count, this.realCoinTexture, 1.2);
+  }
+
+  public startContinuousCoinBurst(x: number, y: number): any {
+    return setInterval(() => {
+      this._burstInternal(x, y, 5, this.realCoinTexture, 1.2); 
+    }, 100);
+  }
+
+  public stopContinuousBurst(intervalId: any): void {
+    if (intervalId) clearInterval(intervalId);
+  }
+
+  private _burstInternal(x: number, y: number, count: number, texture: Texture, scaleMod: number = 1.0) {
+    const configScale = (CONFIG as any).UI_COIN_VFX_SCALE ?? 1.0;
+    const configSpeed = (CONFIG as any).UI_COIN_VFX_SPEED ?? 1.0;
+    const configBurstStrength = (CONFIG as any).UI_COIN_VFX_BURST_STRENGTH ?? 1.0;
+    const configZIndex = (CONFIG as any).UI_COIN_VFX_ZINDEX ?? 5;
+
+    for (let i = 0; i < count; i++) {
+      const coin = new Sprite(texture);
+      coin.anchor.set(0.5);
+      coin.zIndex = configZIndex;
+      
+
+      // Random scale 
+      const baseScale = (Math.random() * 0.5 + 0.8) * scaleMod * configScale;
       coin.scale.set(baseScale);
 
-      // Random spin speed for realistic coin flipping effect
-      const spinSpeed = (Math.random() - 0.5) * 25;
+      const spinSpeed = (Math.random() - 0.5) * 30 * configSpeed;
 
       coin.x = x;
       coin.y = y;
 
       this.container.addChild(coin);
 
-      // Fountain upward, slight left/right spread
-      const angle = Math.random() * (Math.PI / 2) - Math.PI / 4;
-      const speed = Math.random() * 600 + 400;
+      // Explosion center: Full 360 spread
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (Math.random() * 800 + 400) * configSpeed * configBurstStrength;
 
-      let vx = Math.sin(angle) * speed;
-      let vy = -Math.cos(angle) * speed;
+      let vx = Math.cos(angle) * speed;
+      let vy = Math.sin(angle) * speed;
 
-      const gravity = 800; // Downward acceleration
-      const duration = Math.random() * 1.5 + 1.5;
+      const gravity = 500; 
+      const duration = Math.random() * 1.5 + 2.0;
 
-      // GSAP tween to handle frame-by-frame physics
+      // GSAP 
       const dummy = { t: 0, lastT: 0 };
       gsap.to(dummy, {
         t: duration,
@@ -89,7 +116,7 @@ export class ParticleEmitter {
           coin.x += vx * dt;
           coin.y += vy * dt;
 
-          // 3D-ish coin flipping
+          // 3Dcoin flipping
           coin.scale.x = Math.sin(dummy.t * spinSpeed) * baseScale;
 
           // Fade out
