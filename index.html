@@ -566,34 +566,10 @@
           catch (_) { return String(n) + ".00"; }
         }
 
-        async function getBetSizes() {
-          // Prefer backend /config bet_sizes + base_bet_multiplier
+        // Fallback only when game is not available (e.g. script load order). No /config fetch.
+        function getBetSizesFallback() {
           var cfg = window.slotRulesConfig || {};
           var cfgMult = typeof cfg.BASE_BET_MULTIPLIER === "number" && cfg.BASE_BET_MULTIPLIER > 0 ? cfg.BASE_BET_MULTIPLIER : 30;
-          try {
-            var base = window.slotApiBaseUrl;
-            if (base) {
-              var url = String(base);
-              if (url.charAt(url.length - 1) === "/") url = url.slice(0, -1);
-              var res = await fetch(url + "/config");
-              if (res.ok) {
-                var json = await res.json();
-                var data = json && json.data;
-                var sizes = data && data.bet_sizes;
-                var mult = data && typeof data.base_bet_multiplier === "number" && data.base_bet_multiplier > 0
-                  ? data.base_bet_multiplier
-                  : cfgMult;
-                if (Array.isArray(sizes) && sizes.length) {
-                  betState.baseMult = mult;
-                  return sizes
-                    .map(Number)
-                    .filter(function(x){ return Number.isFinite(x); })
-                    .map(function(x){ return x * mult; });
-                }
-              }
-            }
-          } catch (_) {}
-
           if (cfg && Array.isArray(cfg.BET_SIZES) && cfg.BET_SIZES.length) {
             betState.baseMult = cfgMult;
             return cfg.BET_SIZES
@@ -601,7 +577,6 @@
               .filter(function(x){ return Number.isFinite(x); })
               .map(function(x){ return x * cfgMult; });
           }
-
           var defaultSizes = [10,20,30,40,50,60,70,80,90,100,200,300,400,500,1000,2000,3000,5000,10000,20000,30000,40000];
           betState.baseMult = cfgMult;
           return defaultSizes.map(function(x){ return x * cfgMult; });
@@ -624,7 +599,7 @@
           if (amount) amount.textContent = "Bet Amount: ₱" + fmt2(betState.selected || 0);
           if (sub) {
             var betSize = betState.baseMult ? (Number(betState.selected || 0) / betState.baseMult) : 0;
-            sub.textContent = "Bet Size: " + fmt2(betSize) + " • Bet Level: " + betState.baseMult;
+            sub.textContent = "Bet Size: " + fmt2(betSize) + " • Bet Level: 1";
           }
         }
 
@@ -644,21 +619,37 @@
         function openBetModal(detail) {
           var el = document.getElementById("bet-overlay");
           if (!el) return;
-          betState.balance = Number(detail && detail.balance) || 0;
-          var currentBet = Number(detail && detail.currentBet) || 0;
 
-          getBetSizes().then(function(sizes) {
-            betState.betSizes = sizes.slice().sort(function(a,b){ return a-b; });
-            // Snap selection to nearest available index
+          // Prefer game state (single source of truth from /load). No network call.
+          if (window.slotMachine && typeof window.slotMachine.getBetOptions === "function") {
+            var opts = window.slotMachine.getBetOptions();
+            betState.balance = opts.balance;
+            betState.baseMult = opts.baseMultiplier;
+            betState.betSizes = opts.betAmounts.slice();
             var nearestIdx = 0;
             var best = Infinity;
             for (var i = 0; i < betState.betSizes.length; i++) {
-              var d = Math.abs(betState.betSizes[i] - currentBet);
+              var d = Math.abs(betState.betSizes[i] - opts.currentBetAmount);
               if (d < best) { best = d; nearestIdx = i; }
             }
             setIndex(nearestIdx);
-          });
+            el.classList.add("open");
+            el.setAttribute("aria-hidden", "false");
+            return;
+          }
 
+          // Fallback when game not ready (slotRulesConfig only, no /config fetch)
+          betState.balance = Number(detail && detail.balance) || 0;
+          var currentBet = Number(detail && detail.currentBet) || 0;
+          var sizes = getBetSizesFallback();
+          betState.betSizes = sizes.slice().sort(function(a,b){ return a-b; });
+          var nearestIdx = 0;
+          var best = Infinity;
+          for (var i = 0; i < betState.betSizes.length; i++) {
+            var d = Math.abs(betState.betSizes[i] - currentBet);
+            if (d < best) { best = d; nearestIdx = i; }
+          }
+          setIndex(nearestIdx);
           el.classList.add("open");
           el.setAttribute("aria-hidden", "false");
         }
