@@ -11,9 +11,22 @@ import {
 import { Starfield } from "./presentation/animation/Starfield";
 import { SymbolAnimator } from "./presentation/animation/SymbolAnimator";
 import { WaterBg } from "./presentation/animation/WaterBg";
-console.log(window.devicePixelRatio);
+
+import {
+  setAuthToken,
+  setSlotApiBaseUrl,
+  endSession,
+} from "./infrastructure/api/slotApi";
+
 (async () => {
   try {
+    // Configure API base URL and auth token from launch URL (?token=...)
+    setSlotApiBaseUrl(CONFIG.API_BASE_URL);
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token) {
+      setAuthToken(token);
+    }
     const container = document.getElementById("app-container")!;
     const app = new Application();
     await app.init({
@@ -58,6 +71,11 @@ console.log(window.devicePixelRatio);
     };
     (window as any).slotRulesConfig = GAME_RULES;
     (window as any).slotApiBaseUrl = CONFIG.API_BASE_URL;
+
+    // End the backend session when the game page is being closed or refreshed.
+    window.addEventListener("pagehide", () => {
+      void endSession();
+    });
   } catch (error) {
     console.error("Error starting game:", error);
   }

@@ -55,8 +55,8 @@ export class GameController {
   public async handleSpinRequest(): Promise<void> {
     if (this.isSpinning) return;
 
-    const bet = this.state.currentBet;
-    if (this.state.balance < bet && this.state.freeSpinsCount <= 0) {
+    const betAmount = this.state.currentBetAmount;
+    if (this.state.balance < betAmount && this.state.freeSpinsCount <= 0) {
       this.ui.container.emit("insufficientBalance");
       this.stopAutoSpin();
       return;
@@ -73,7 +73,7 @@ export class GameController {
         this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0, this.isAutoSpinning);
         this.spinOrchestrator.showSpinFeedback(this.state.freeSpinsCount > 0);
 
-        const response = await this.executeSpin(bet);
+        const response = await this.executeSpin();
         await this.processSpinResult(response);
 
         // If we still have free spins, continue the loop automatically
@@ -148,11 +148,11 @@ export class GameController {
     this.updateUI();
   }
 
-  private async executeSpin(bet: number): Promise<slotApi.BackendPlayData> {
+  private async executeSpin(): Promise<slotApi.BackendPlayData> {
     if (this.state.freeSpinsCount > 0) {
-      return await slotApi.playFreeGame(bet);
+      return await slotApi.playFreeGame();
     }
-    return await slotApi.play(bet);
+    return await slotApi.play(this.state.currentBetSize, this.state.betLevel);
   }
 
   private async processSpinResult(
@@ -177,7 +177,8 @@ export class GameController {
         async () => {
           //. Handle Jackpots
           if (data.jackpot_hit && data.jackpot_type) {
-            const winAmount = data.jackpot_prizes?.[data.jackpot_type] || 0;
+            const raw = data.jackpot_prizes?.[data.jackpot_type];
+            const winAmount = typeof raw === "number" ? raw : Number(raw) || 0;
             await this.jackpotPresenter.show(data.jackpot_type, winAmount);
           }
 
@@ -186,7 +187,7 @@ export class GameController {
             await this.cascadeOrchestrator.play(
               data.slot.cascaded,
               baseEvaluationWin,
-              this.state.currentBet,
+              this.state.currentBetAmount,
               (accWin) => {
                 // Visually update win, but don't exceed backend final total_win
                 this.state.totalWin = Math.min(accWin, finalSpinWin);
@@ -214,13 +215,13 @@ export class GameController {
             // Completely suppress individual winText popups during active bonus spins
             this.ui.winText.text = "";
             
-            // If last free spin, show the final celebration
+             // If this was the absolute last free spin, show the final celebration
             if (this.state.freeSpinsCount === 0 && this.state.bonusSessionWin > 0) {
               const totalBonusWin = this.state.bonusSessionWin;
-              const isBigWin = totalBonusWin >= this.state.currentBet * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
+              const isBigWin = totalBonusWin >= this.state.currentBetAmount * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
               
               if (isBigWin) {
-                await this.ui.winPresenter.showTierWin(totalBonusWin, this.state.currentBet);
+                await this.ui.winPresenter.showTierWin(totalBonusWin, this.state.currentBetAmount);
               } else {
                 this.ui.winText.text = `TOTAL BONUS WIN\n₱${totalBonusWin.toLocaleString()}`;
                 this.ui.winPresenter.showWin();
@@ -231,14 +232,13 @@ export class GameController {
           } else if (finalSpinWin > 0) {
             const isBigWin =
               finalSpinWin >=
-              this.state.currentBet * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
+              this.state.currentBetAmount * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
 
             if (isBigWin) {
               await this.ui.winPresenter.showTierWin(
                 finalSpinWin,
-                this.state.currentBet,
-              );
-            } else {
+                this.state.currentBetAmount,
+            );
               this.ui.updateTextValues(
                 this.state.balance,
                 finalSpinWin,
@@ -265,27 +265,26 @@ export class GameController {
   }
 
   public handleBetAdjust(delta: -1 | 1): void {
-    const nextBet = this.state.getNextBetAmount(delta);
-    this.state.currentBet = nextBet;
+    const nextSize = this.state.getNextBetSize(delta);
+    this.state.currentBetSize = nextSize;
     this.updateUI();
   }
 
-  public handleBetConfirm(bet: number): void {
-    this.state.currentBet = bet;
+  /** Accept display amount (e.g. from menu); snaps to nearest valid bet size. */
+  public handleBetConfirm(amount: number): void {
+    const mult = this.state.betLevel * this.state.baseMultiplier || 1;
+    const size = amount / mult;
+    this.state.currentBetSize = this.state.snapBetSizeToList(size);
     this.updateUI();
   }
 
   public updateUI(): void {
-    const isFreeSpin = this.state.freeSpinsCount > 0;
-    const winToShow = isFreeSpin ? this.state.bonusSessionWin : this.state.totalWin;
-
     this.ui.updateTextValues(
       this.state.balance,
-      winToShow,
+      this.state.totalWin,
       this.state.freeSpinsCount,
-      isFreeSpin,
     );
-    this.ui.updateBetTextDisplay(this.state.currentBet.toString());
-    this.ui.toggleButtonTheme(isFreeSpin, this.isAutoSpinning);
+    this.ui.updateBetTextDisplay(this.state.currentBetAmount.toString());
+    this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0, this.isAutoSpinning);
   }
 }

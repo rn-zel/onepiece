@@ -264,8 +264,7 @@ export const GAME_RULES = {
   BASE_BET_MULTIPLIER: 30,
   BET_LEVELS: [1],
   BET_SIZES: [
-    10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000,
-    3000, 5000, 10000, 20000, 30000, 40000,
+    20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000,
   ],
   JACKPOT_MINI: 1000,
   JACKPOT_MAJOR: 50000,
@@ -341,7 +340,7 @@ const SHARED = {
     DEFAULT_TINT: 0xffffff,
     FREE_SPINS_TINT: 0xffbdd5,
   },
-  API_BASE_URL: "http://localhost:3000",
+  API_BASE_URL: "http://blitzgamingbackoffice.test/api/v1/",
   BUY_COST_MULTIPLIER: 10,
   REEL_SPIN_DURATION: 1.5,
   REEL_STAGGER_DELAY: 0.2,

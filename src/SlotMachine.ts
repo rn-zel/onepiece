@@ -249,6 +249,10 @@ export class SlotMachine {
       this.gameState.balance = data.player?.balance ?? this.gameState.balance;
       this.gameState.freeSpinsCount = data.free_spin?.count ?? 0;
       this.gameState.bonusSessionWin = data.free_spin?.total_win ?? 0;
+            this.gameState.updateFromLoadData({
+        machine: data.machine,
+        info: data.info,
+      });
       if (
         data.jackpot_prizes &&
         typeof data.jackpot_prizes.mini === "number" &&
@@ -276,11 +280,35 @@ export class SlotMachine {
     }
   }
 
+  /**
+   * Returns bet options for the HTML bet modal. Used so the modal does not need to call /config.
+   * Single source of truth: game state (from /load or GAME_RULES fallback).
+   */
+  public getBetOptions(): {
+    betAmounts: number[];
+    balance: number;
+    currentBetAmount: number;
+    baseMultiplier: number;
+  } {
+    const level = Math.max(1, this.gameState.betLevel);
+    const mult = Math.max(0, this.gameState.baseMultiplier) || 1;
+    const betAmounts = this.gameState.betSizes
+      .map((s) => s * level * mult)
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+    return {
+      betAmounts: betAmounts.length > 0 ? betAmounts : [this.gameState.currentBetAmount],
+      balance: this.gameState.balance,
+      currentBetAmount: this.gameState.currentBetAmount,
+      baseMultiplier: mult,
+    };
+  }
+
   public openBuyFreeSpinsModal(): void {
     if (this.gameController.spinning) return;
     if (this.vfxManager.isFreeSpinsTheme) return;
     this.soundManager.playSFX("sfx_button");
-    const cost = this.gameState.currentBet * CONFIG.BUY_COST_MULTIPLIER;
+    const cost = this.gameState.buyCost;
     if (this.gameState.balance < cost) {
       this.showInsufficientBalanceMessage();
       return;
@@ -296,7 +324,10 @@ export class SlotMachine {
     this.buyFreeSpinsModal.hide();
 
     try {
-      const data = await slotApi.buyFreeGame(this.gameState.currentBet);
+      const data = await slotApi.buyFreeGame(
+        this.gameState.currentBetSize,
+        this.gameState.betLevel,
+      );
       this.gameState.balance = data.balance;
       this.gameState.freeSpinsCount = data.free_spin?.count ?? 0;
       const grid = slotApi.backendReelToGrid(data.slot.reel);

@@ -66,13 +66,24 @@ export type BackendFreeSpin = {
   add?: number | null;
 };
 
+export type BackendMachineConfig = {
+  machine_id: number;
+  min_bet?: number;
+  max_bet?: number;
+  bet_sizes?: number[];
+  bet_levels?: number[];
+  default?: { bet_size: number; bet_level: number };
+  multiplier?: number;
+  free_spin_cost?: number;
+};
+
 export type BackendLoadData = {
   player: { balance: number; currency?: string };
+  machine?: BackendMachineConfig;
+  info?: { base_multiplier?: number };
+  slot?: { reel?: BackendReel } | null;
   jackpot_prizes?: Record<string, unknown> | null;
-  free_spin?: {
-    count: number;
-    total_win?: number;
-  } | null;
+  free_spin?: { count: number; total_win?: number } | null;
 };
 
 export type BackendPlayData = {
@@ -81,23 +92,36 @@ export type BackendPlayData = {
   balance: number;
   bet_size?: number;
   bet_level?: number;
-  is_free_spin?: boolean;
   free_spin?: BackendFreeSpin | null;
+  is_free_spin?: boolean;
   slot: BackendSlot;
-  jackpot_prizes?: Record<string, number> | null;
+  jackpot_prizes?: Record<string, unknown> | null;
   max_win_hit?: boolean;
   jackpot_hit?: boolean;
   jackpot_type?: "mini" | "major" | "grand";
-  /** Debug-only: ask frontend to play Big → Mega → Max in one spin */
-  debug_tier_sequence?: Array<"big" | "mega" | "max">;
-  /** Debug-only: optional per-tier win amounts for showcase */
-  debug_tier_amounts?: Partial<Record<"big" | "mega" | "max", number>>;
 };
 
 export type BackendResponse<T> = { success: boolean; data: T };
 
-/** Default targets slot-free.js backend (run: node slot-free.js → http://localhost:3000). Override via setSlotApiBaseUrl(CONFIG.API_BASE_URL). */
-let apiBaseUrl = "http://localhost:3000";
+type BackendErrorResponse = {
+  error?: boolean;
+  code?: string;
+  message?: string;
+  success?: boolean;
+};
+
+type SessionInfo = {
+  session_id: string;
+  status: string;
+  balance: number;
+  started_at: string;
+};
+
+let apiBaseUrl = "http://blitzgamingbackoffice.test/api/v1";
+let authToken: string | null = null;
+let currentSessionId: string | null = null;
+let roundCounter = 0;
+let machineId: number | null = 421;
 
 export function setSlotApiBaseUrl(url: string) {
   apiBaseUrl = url.replace(/\/$/, "");
@@ -107,57 +131,174 @@ export function getSlotApiBaseUrl(): string {
   return apiBaseUrl;
 }
 
+export function setAuthToken(token: string | null) {
+  authToken = token?.trim() ? token.trim() : null;
+  currentSessionId = null;
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+export function setMachineId(id: number | null) {
+  machineId =
+    typeof id === "number" && Number.isFinite(id) && id > 0 ? Math.floor(id) : null;
+}
+
+export function getMachineId(): number | null {
+  return machineId;
+}
+
+function nextRoundId(): string {
+  roundCounter += 1;
+  return `r-${Date.now()}-${roundCounter}`;
+}
+
 async function fetchApi<T>(path: string, body?: object): Promise<T> {
-  const res = await fetch(`${apiBaseUrl}${path}`, {
+  if (!authToken) {
+    throw new Error("Missing token. Please launch the game from the lobby.");
+  }
+
+  const url = `${apiBaseUrl}${path}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${authToken}`,
+    },
+    body: body ? JSON.stringify(body) : JSON.stringify({}),
   });
-  if (!res.ok) throw new Error(`Slot API ${path}: ${res.status}`);
-  const json = await res.json();
-  if (json.success === false) throw new Error(json.message || "API error");
+
+  let json: unknown = null;
+  try {
+    json = await res.json();
+  } catch {
+    // ignore JSON parse errors; we'll throw a generic message below
+  }
+
+  if (!res.ok) {
+    console.error("Slot API error", { url, status: res.status, body, json });
+    const err = json as BackendErrorResponse | null;
+    throw new Error(err?.message || `Slot API ${path}: ${res.status}`);
+  }
+
+  const err = json as BackendErrorResponse | null;
+  if (err?.error === true || err?.success === false) {
+    console.error("Slot API application error", { url, body, json });
+    throw new Error(err?.message || "API error");
+  }
+
   return json as T;
+}
+
+/** POST /session/start – start and cache session_id. */
+export async function ensureSession(): Promise<SessionInfo> {
+  if (currentSessionId) {
+    return {
+      session_id: currentSessionId,
+      status: "active",
+      balance: 0,
+      started_at: "",
+    };
+  }
+
+  const out = await fetchApi<BackendResponse<SessionInfo>>("/session/start", {});
+  currentSessionId = out.data.session_id;
+  return out.data;
+}
+
+/** POST /session/end – best-effort session close. Safe to call multiple times. */
+export async function endSession(): Promise<void> {
+  if (!currentSessionId) return;
+
+  const sessionId = currentSessionId;
+  try {
+    await fetchApi<BackendResponse<unknown>>("/session/end", {
+      session_id: sessionId,
+    });
+  } catch (err) {
+    console.warn("Slot API: failed to end session", err);
+  } finally {
+    if (currentSessionId === sessionId) {
+      currentSessionId = null;
+    }
+  }
 }
 
 /** POST /load – get initial balance, free spin count, jackpot prizes. */
 export async function load(): Promise<BackendLoadData> {
-  const out = await fetchApi<BackendResponse<BackendLoadData>>("/load", {});
+  await ensureSession();
+  const out = await fetchApi<BackendResponse<BackendLoadData>>("/load", {
+    session_id: currentSessionId,
+    machine_id: machineId ?? undefined,
+  });
+
+  const newMachineId = out.data.machine?.machine_id;
+  if (typeof newMachineId === "number") setMachineId(newMachineId);
+
+  if (out.data.free_spin && (out.data as any).free_spin.freeSpinWin !== undefined) {
+    const fs: any = out.data.free_spin;
+    fs.total_win = fs.total_win ?? fs.freeSpinWin;
+  }
+
   return out.data;
 }
 
-/** POST /play – main game spin. Send bet so backend can use it (slot-free.js uses global totalBet; real backend should use body.bet). */
-export async function play(bet: number): Promise<BackendPlayData> {
+/** POST /play – main game spin. Sends only bet_size and bet_level; backend computes bet amount. */
+export async function play(
+  betSize: number,
+  betLevel: number = 1,
+): Promise<BackendPlayData> {
+  await ensureSession();
   const out = await fetchApi<BackendResponse<BackendPlayData>>("/play", {
-    bet,
+    session_id: currentSessionId,
+    round_id: nextRoundId(),
+    machine_id: machineId ?? undefined,
+    bets: { bet_size: betSize, bet_level: betLevel },
   });
   return out.data;
 }
 
-/** POST /play-free-game – one free spin. Sends bet so backend can compute payouts. */
-export async function playFreeGame(
-  bet: number = 100,
+/** POST /play-free-game – one free spin. */
+export async function playFreeGame(_bet?: number): Promise<BackendPlayData> {
+  await ensureSession();
+  const out = await fetchApi<BackendResponse<BackendPlayData>>("/play-free-game", {
+    session_id: currentSessionId,
+    round_id: nextRoundId(),
+    machine_id: machineId ?? undefined,
+  });
+  return {
+    ...out.data,
+    free_spin: out.data.free_spin ?? null,
+  };
+}
+
+/** POST /buy-free-game – buy free spins. Sends only bet_size and bet_level. */
+export async function buyFreeGame(
+  betSize: number,
+  betLevel: number = 1,
 ): Promise<BackendPlayData> {
-  const out = await fetchApi<BackendResponse<BackendPlayData>>(
-    "/play-free-game",
-    { bet },
-  );
+  await ensureSession();
+  const out = await fetchApi<BackendResponse<BackendPlayData>>("/buy-free-game", {
+    session_id: currentSessionId,
+    round_id: nextRoundId(),
+    machine_id: machineId ?? undefined,
+    bets: { bet_size: betSize, bet_level: betLevel },
+  });
   return out.data;
 }
 
-/** POST /buy-free-game – buy free spins (cost = bet * 10 in sample). */
-export async function buyFreeGame(bet: number): Promise<BackendPlayData> {
-  const out = await fetchApi<BackendResponse<BackendPlayData>>(
-    "/buy-free-game",
-    { bet },
-  );
-  return out.data;
-}
-
-/** POST /jackpot – claim jackpot. */
+/** POST /jackpot – claim jackpot (currently always mini for demo). */
 export async function jackpot(): Promise<{ win: number; balance: number }> {
+  await ensureSession();
   const out = await fetchApi<BackendResponse<{ win: number; balance: number }>>(
     "/jackpot",
-    {},
+    {
+      session_id: currentSessionId,
+      round_id: nextRoundId(),
+      jackpot_type: "mini",
+    },
   );
   return out.data;
 }
@@ -167,16 +308,10 @@ export async function jackpot(): Promise<{ win: number; balance: number }> {
  * Enforces a Column-Major matrix [reelIndex][rowIndex] required by the Domain.
  */
 export function backendReelToGrid(reel: BackendReel): number[][] {
-  // 1. Map string identifiers to numeric domain indices
-  const indexGrid = reel.map((row) =>
-    row.map((name) => symbolNameToIndex(name)),
-  );
+  const indexGrid = reel.map((row) => row.map((name) => symbolNameToIndex(name)));
 
   let finalGrid: number[][];
 
-  // 2. Validate and Transpose:
-  // If the backend returns Row-Major data (e.g., 3 arrays of 5 elements),
-  // transpose it into Col-Major data (5 arrays of 3 elements).
   if (indexGrid.length > 0 && indexGrid[0].length > indexGrid.length) {
     const transposedGrid: number[][] = [];
     const numCols = indexGrid[0].length;
