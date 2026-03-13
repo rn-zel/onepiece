@@ -94,7 +94,7 @@ export class CascadeOrchestrator {
         continue;
       }
 
-      const stepPayout = step.win * (step.multiplier ?? 1);
+      const stepPayout = step.win;
       if (stepPayout > 0) this.soundManager.playSFX("sfx_coin");
 
       // Strictly follow the progression logic. With the new backend,
@@ -251,28 +251,20 @@ export class CascadeOrchestrator {
    */
   private _buildSteps(
     cascaded: BackendCascadeStep[],
-    initialWin: number,
+    _initialWin: number,
   ): CascadePlayStep[] {
     const steps: CascadePlayStep[] = [];
 
-    if (initialWin > 0 && cascaded.length > 0) {
-      steps.push({
-        win: initialWin,
-        multiplier: 1,
-        cascades: cascaded[0].cascades,
-        rng: cascaded[0].rng as string[][] | null,
-      });
-    }
+    for (let i = 0; i < cascaded.length; i++) {
+      const step = cascaded[i];
+      if (step.win <= 0) continue;
 
-    for (let i = 0; i < cascaded.length - 1; i++) {
-      if (cascaded[i].win > 0) {
-        steps.push({
-          win: cascaded[i].win,
-          multiplier: cascaded[i].multiplier,
-          cascades: cascaded[i + 1].cascades,
-          rng: cascaded[i + 1].rng as string[][] | null,
-        });
-      }
+      steps.push({
+        win: step.win,
+        multiplier: step.multiplier,
+        cascades: step.cascades,
+        rng: step.rng as string[][] | null,
+      });
     }
 
     return steps;

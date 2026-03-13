@@ -161,14 +161,14 @@ export class GameController {
     const grid = slotApi.backendReelToGrid(data.slot.reel);
     this.telemetry.trackSpin(this.state.currentBet, data.total_win, data.is_free_spin);
 
-    //Initial State Update (Trust balance from backend)
-    const wasFreeSpin = this.state.freeSpinsCount > 0;
+    // Initial State Update (Trust balance from backend)
+    const wasFreeSpin = this.state.freeSpinsCount > 0 || data.is_free_spin === true;
     this.state.balance = data.balance;
     this.state.freeSpinsCount = data.free_spin?.count ?? 0;
     const isFreeSpinNow = this.state.freeSpinsCount > 0;
 
     const finalSpinWin = data.total_win;
-    const baseEvaluationWin = data.win;
+    const spinWin = data.win;
 
     return new Promise<void>((resolve) => {
       this.spinOrchestrator.animateReels(
@@ -186,12 +186,15 @@ export class GameController {
           if (data.slot.cascaded && data.slot.cascaded.length > 0) {
             await this.cascadeOrchestrator.play(
               data.slot.cascaded,
-              baseEvaluationWin,
+              0,
               this.state.currentBetAmount,
               (accWin) => {
-                // Visually update win, but don't exceed backend final total_win
-                this.state.totalWin = Math.min(accWin, finalSpinWin);
-                this.updateUI();
+                // During free spins, HUD should show the running bonus total,
+                // not per-spin cascade totals.
+                if (!data.is_free_spin) {
+                  this.state.totalWin = Math.min(accWin, finalSpinWin);
+                  this.updateUI();
+                }
               },
             );
           }
@@ -205,13 +208,12 @@ export class GameController {
           }
 
           if (data.is_free_spin) {
-            this.state.bonusSessionWin += finalSpinWin;
-            this.ui.updateTextValues(
-              this.state.balance,
-              this.state.bonusSessionWin,
-              this.state.freeSpinsCount,
-              true,
-            );
+            // For free spins, derive the running bonus total from the sum of per-spin wins.
+            // This guarantees:
+            // - Zero-win spins do not change the total.
+            // - The UI total matches the backend batch win (sum of spin wins).
+            this.state.bonusSessionWin += spinWin;
+            this.updateUI();
             // Completely suppress individual winText popups during active bonus spins
             this.ui.winText.text = "";
             
@@ -239,11 +241,8 @@ export class GameController {
                 finalSpinWin,
                 this.state.currentBetAmount,
             );
-              this.ui.updateTextValues(
-                this.state.balance,
-                finalSpinWin,
-                this.state.freeSpinsCount,
-              );
+              this.state.totalWin = finalSpinWin;
+              this.updateUI();
               this.ui.winText.text = `WIN\n₱${finalSpinWin.toLocaleString()}`;
               this.ui.winPresenter.showWin();
               await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -279,10 +278,14 @@ export class GameController {
   }
 
   public updateUI(): void {
+    const inBonus = this.state.freeSpinsCount > 0;
+    const displayWin = inBonus ? this.state.bonusSessionWin : this.state.totalWin;
+
     this.ui.updateTextValues(
       this.state.balance,
-      this.state.totalWin,
+      displayWin,
       this.state.freeSpinsCount,
+      inBonus,
     );
     this.ui.updateBetTextDisplay(this.state.currentBetAmount.toString());
     this.ui.toggleButtonTheme(this.state.freeSpinsCount > 0, this.isAutoSpinning);
