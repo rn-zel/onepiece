@@ -183,18 +183,21 @@ export class GameController {
           }
 
           // Play Cascades
+          const baseBonusWin = this.state.bonusSessionWin;
           if (data.slot.cascaded && data.slot.cascaded.length > 0) {
             await this.cascadeOrchestrator.play(
               data.slot.cascaded,
               0,
               this.state.currentBetAmount,
               (accWin) => {
-                // During free spins, HUD should show the running bonus total,
-                // not per-spin cascade totals.
-                if (!data.is_free_spin) {
+                if (data.is_free_spin) {
+                  // Progressive update for bonus session
+                  this.state.bonusSessionWin = baseBonusWin + accWin;
+                } else {
+                  // Progressive update for base game spin
                   this.state.totalWin = Math.min(accWin, finalSpinWin);
-                  this.updateUI();
                 }
+                this.updateUI();
               },
             );
           }
@@ -208,11 +211,8 @@ export class GameController {
           }
 
           if (data.is_free_spin) {
-            // For free spins, derive the running bonus total from the sum of per-spin wins.
-            // This guarantees:
-            // - Zero-win spins do not change the total.
-            // - The UI total matches the backend batch win (sum of spin wins).
-            this.state.bonusSessionWin += spinWin;
+            // Guarantee the final sum matches the backend exact 'win' for this spin.
+            this.state.bonusSessionWin = baseBonusWin + spinWin;
             this.updateUI();
             // Completely suppress individual winText popups during active bonus spins
             this.ui.winText.text = "";
@@ -222,12 +222,16 @@ export class GameController {
               const totalBonusWin = this.state.bonusSessionWin;
               const isBigWin = totalBonusWin >= this.state.currentBetAmount * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
               
+              // Always show the basic total win panel first
+              this.ui.winText.text = `TOTAL BONUS WIN\n₱${totalBonusWin.toLocaleString()}`;
+              this.ui.winPresenter.showWin();
+              
               if (isBigWin) {
+                // Wait while standard panel is visible, then start flashier tier celebration
+                await new Promise((resolve) => setTimeout(resolve, 2000));
                 await this.ui.winPresenter.showTierWin(totalBonusWin, this.state.currentBetAmount);
               } else {
-                this.ui.winText.text = `TOTAL BONUS WIN\n₱${totalBonusWin.toLocaleString()}`;
-                this.ui.winPresenter.showWin();
-                await new Promise((resolve) => setTimeout(resolve, 2500));
+                await new Promise((resolve) => setTimeout(resolve, 3000));
                 this.ui.winPresenter.hide();
               }
             }
@@ -236,15 +240,21 @@ export class GameController {
               finalSpinWin >=
               this.state.currentBetAmount * (CONFIG.BIG_WIN_MULTIPLIER ?? 10);
 
+            this.state.totalWin = finalSpinWin;
+            this.updateUI();
+
+            // Show standard win panel first
+            this.ui.winText.text = `WIN\n₱${finalSpinWin.toLocaleString()}`;
+            this.ui.winPresenter.showWin();
+
             if (isBigWin) {
+              // Wait while standard panel is visible, then start flashier tier celebration
+              await new Promise((resolve) => setTimeout(resolve, 1500));
               await this.ui.winPresenter.showTierWin(
                 finalSpinWin,
                 this.state.currentBetAmount,
-            );
-              this.state.totalWin = finalSpinWin;
-              this.updateUI();
-              this.ui.winText.text = `WIN\n₱${finalSpinWin.toLocaleString()}`;
-              this.ui.winPresenter.showWin();
+              );
+            } else {
               await new Promise((resolve) => setTimeout(resolve, 2000));
               this.ui.winPresenter.hide();
             }
