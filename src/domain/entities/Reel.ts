@@ -81,6 +81,7 @@ export class Reel {
         availableWidth / texture.width,
         this.symbolSize / texture.height,
       );
+      
       s.scale.set(scale);
       (s as unknown as SymbolSprite).baseScale = scale;
       s.x = this.cardWidth / 2;
@@ -126,15 +127,11 @@ export class Reel {
       const symbolHeight = this.symbolSize + this.symbolSpacing;
       symbol.y = (j - 1) * symbolHeight + this.symbolSize / 2;
 
-      const availableWidth = this.cardWidth - this.symbolMargin * 2;
-      const scale = Math.min(
-        availableWidth / symbol.width,
-        this.symbolSize / symbol.height,
-      );
+      const scale = this.symbolSize;
 
       symbol.scale.set(scale);
       symbol.anchor.set(0.5, 0.5);
-      symbol.x = this.cardWidth / 2;
+      symbol.x = this.cardWidth ;
 
       (symbol as unknown as SymbolSprite).baseScale = scale;
       (symbol as unknown as SymbolSprite).lap = 0;

@@ -1,5 +1,5 @@
 import { Application, Container, Sprite, Texture, Graphics } from "pixi.js";
-import { CONFIG, DEVICE_TYPES, getDeviceType } from "./domain/constants/Config";
+import { CONFIG, DEVICE_TYPES, getDeviceType, LANDSCAPE, PORTRAIT } from "./domain/constants/Config";
 import * as slotApi from "./infrastructure/api/slotApi";
 import { Reel } from "./domain/entities/Reel";
 import gsap from "gsap";
@@ -21,6 +21,7 @@ import { JackpotPresenter } from "./presentation/ui/JackpotPresenter";
 import { BuyFreeSpinsModal } from "./presentation/ui/BuyFreeSpinsModal";
 import { GameState } from "./domain/models/GameState";
 import { GameController } from "./application/services/GameController";
+import { CloudBackground } from "./presentation/animation/CloudBackground";
 
 /**
  * SlotMachine acts as the main View component in the presentation layer.
@@ -68,6 +69,7 @@ export class SlotMachine {
   lightning: LightningBorder = new LightningBorder();
   starfield: Starfield;
   waterBg: WaterBg;
+  cloudBackground: CloudBackground;
 
   constructor(
     app: Application,
@@ -76,12 +78,14 @@ export class SlotMachine {
     starfield: Starfield,
     symbolAnimator: SymbolAnimation,
     waterBg: WaterBg,
+    cloudBackground: CloudBackground,
   ) {
     this.app = app;
     this.slotTextures = textures;
     this.backgroundTexture = bgTexture;
     this.starfield = starfield;
     this.waterBg = waterBg;
+    this.cloudBackground = cloudBackground;
 
     this.gameState = new GameState();
 
@@ -95,7 +99,6 @@ export class SlotMachine {
     this.mainContainer.sortableChildren = true;
     this.app.stage.addChild(this.mainContainer);
     this.app.stage.addChild(this.modalLayer);
-    this.app.stage.sortableChildren = true;
     this.modalLayer.zIndex = 1000;
 
     this.mainContainer.addChild(this.backgroundContainer);
@@ -178,6 +181,7 @@ export class SlotMachine {
       this.lightning,
       this.starfield,
       this.waterBg,
+      this.cloudBackground,
     );
 
     this.uiManager.container.zIndex = 100;
@@ -538,6 +542,7 @@ export class SlotMachine {
       : CONFIG.BACKGROUND_OFFSET_X_LANDSCAPE;
     bg.x = padding + bgOffX;
     bg.y = padding + 10;
+    bg.zIndex = 0;
     this.backgroundContainer.addChild(bg);
   }
 
@@ -615,6 +620,7 @@ export class SlotMachine {
   }
 
   handleResize() {
+    this.cloudBackground.resize();
     const screenWidth = this.app.screen.width;
     const screenHeight = this.app.screen.height;
     const isPortrait = screenHeight > screenWidth;
@@ -650,6 +656,12 @@ export class SlotMachine {
     }
 
     scale *= machineScale;
+
+    if (this.vfxManager && this.vfxManager.isFreeSpinsTheme) {
+      scale *= isPortrait
+        ? PORTRAIT.FREE_SPINS_SCALE_MULT
+        : LANDSCAPE.FREE_SPINS_SCALE_MULT;
+    }
     this.mainContainer.scale.set(scale);
     this.mainContainer.x =
       screenWidth / 2 +
@@ -749,7 +761,7 @@ export class SlotMachine {
 
     if (this.lightning && this.lightning.sprite) {
       this.lightning.sprite.x = 0;
-      this.lightning.sprite.y = 30; 
+      this.lightning.sprite.y = 5; 
 
       // Match the reelContainer's dimensions
       this.lightning.sprite.width = totalWidth * 1.1;

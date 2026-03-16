@@ -128,7 +128,7 @@ export class UIManager {
     this.spinButton.on("pointerdown", this.onSpin);
     this.container.addChild(this.spinButton);
 
-    this.autoSpinButton = new Sprite(Assets.get("autoSpin.png"));
+    this.autoSpinButton = new Sprite(Assets.get("autoplay.png"));
     this.autoSpinButton.anchor.set(0.5);
     this.autoSpinButton.scale.set(CONFIG.AUTO_BTN_LANDSCAPE_SCALE);
     this.autoSpinButton.x = CONFIG.AUTO_BTN_LANDSCAPE_X;
@@ -136,11 +136,13 @@ export class UIManager {
     this.autoSpinButton.interactive = true;
     this.autoSpinButton.cursor = "pointer";
     this.autoSpinButton.on("pointerdown", () => {
-      if (this.autoSpinButton.tint !== CONFIG.UI_COLORS.DEFAULT_TINT && this.autoSpinButton.tint !== CONFIG.UI_COLORS.FREE_SPINS_TINT) {
-         // Auto spin is active, stop it
-         window.dispatchEvent(new CustomEvent("slot-stop-auto"));
+      const isAutoActive = this.autoSpinButton.texture === Assets.get("autostop.png");
+      if (isAutoActive) {
+        // Auto spin is active, stop it immediately
+        window.dispatchEvent(new CustomEvent("slot-stop-auto"));
+        this.autoSpinButton.texture = Assets.get("autoplay.png");
       } else {
-         this.autoSpinModal.show();
+        this.autoSpinModal.show();
       }
     });
     this.container.addChild(this.autoSpinButton);
@@ -444,7 +446,8 @@ export class UIManager {
       this.spinButton.tint = tintColor;
     }
     if (this.autoSpinButton) {
-      this.autoSpinButton.tint = isAuto ? 0x00ff00 : tintColor; // Green when active
+      this.autoSpinButton.texture = Assets.get(isAuto ? "autostop.png" : "autoplay.png");
+      this.autoSpinButton.tint = tintColor;
     }
     if (this.buyFreeSpinButton) this.buyFreeSpinButton.tint = tintColor;
     if (this.betButton) this.betButton.tint = tintColor;
@@ -492,7 +495,6 @@ export class UIManager {
     // 2. Animate tints
     const elements = [
       this.spinButton,
-      this.autoSpinButton,
       this.buyFreeSpinButton,
       this.betBg,
       this.betButton,

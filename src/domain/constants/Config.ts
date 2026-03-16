@@ -23,6 +23,7 @@ export const LANDSCAPE = {
   CARD_SPACING: 1,
   SYMBOL_MARGIN: 10,
   MACHINE_SCALE: 0.73,
+  FREE_SPINS_SCALE_MULT: 1.1,
   MASK_PX: 30,
   MASK_PY: 35,
   MASK_OFFSET_Y: -20,
@@ -148,6 +149,7 @@ export const PORTRAIT = {
   CARD_SPACING: 1,
   SYMBOL_MARGIN: 10,
   MACHINE_SCALE: 0.4,
+  FREE_SPINS_SCALE_MULT: .9,
   MASK_PX: 30,
   MASK_PY: 35,
   MASK_OFFSET_Y: -20,
@@ -546,14 +548,15 @@ export const ASSETS = {
     "title.png",
     "model.png",
     "spinBTN.png",
-    "autoSpin.png",
-    "plus.png",
+    "autoplay.png",
+    "autostop.png",
+    
     "grand.png",
     "mini.png",
     "major.png",
-    "minus.png",
+    
     "betBTN.png",
-    "1.png",
+   
     "vortex.png",
     "bet.png",
     "balance.png",
@@ -567,8 +570,9 @@ export const ASSETS = {
     "wintier.png",
     "ammountbg.png",
     "win_rays.png",
-    "coin.png"
+    "coin.png",
+    "freebroder.png",
+    "clouds.png"
   ],
-  GIF: ["model1.gif"],
   VIDEO: ["redlight.mp4"],
 };

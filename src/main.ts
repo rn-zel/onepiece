@@ -11,6 +11,7 @@ import {
 import { Starfield } from "./presentation/animation/Starfield";
 import { SymbolAnimator } from "./presentation/animation/SymbolAnimator";
 import { WaterBg } from "./presentation/animation/WaterBg";
+import { CloudBackground } from "./presentation/animation/CloudBackground";
 
 import {
   setAuthToken,
@@ -54,6 +55,10 @@ import {
     app.stage.addChild(starBackground.container);
     await starBackground.init();
 
+    const cloudBackground = new CloudBackground(app);
+    app.stage.addChild(cloudBackground.container);
+    await cloudBackground.init();
+
     const slotTextures = ASSETS.TEXTURES.map((url) => Texture.from(url));
     const bgTexture = Texture.from("border.png");
 
@@ -64,6 +69,7 @@ import {
       starBackground,
       animator,
       waterBg,
+      cloudBackground,
     );
     (window as any).slotMenuConfig = {
       landscape: LANDSCAPE.MENU,

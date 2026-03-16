@@ -4,12 +4,17 @@ import {
   CONFIG,
   getAppWidth,
   getAppHeight,
+  LANDSCAPE,
+  PORTRAIT,
+  getDeviceType,
+  DEVICE_TYPES,
 } from "../../domain/constants/Config";
 import type { Reel } from "../../domain/entities/Reel";
 import type { SoundManager } from "../../infrastructure/audio/SoundManager";
 import type { LightningBorder } from "../animation/LightningBorder";
 import { Starfield } from "../animation/Starfield";
-import type { WaterBg } from "../animation/WaterBg";
+import { WaterBg } from "../animation/WaterBg";
+import { CloudBackground } from "../animation/CloudBackground";
 
 export class VFXManager {
   public isFreeSpinsTheme: boolean = false;
@@ -23,6 +28,7 @@ export class VFXManager {
   public lightning: LightningBorder;
   public starfield: Starfield;
   public waterBg: WaterBg;
+  public cloudBackground: CloudBackground;
 
   constructor(
     app: Application,
@@ -32,6 +38,7 @@ export class VFXManager {
     lightning: LightningBorder,
     starfield: Starfield,
     waterBg: WaterBg,
+    cloudBackground: CloudBackground,
   ) {
     this.app = app;
     this.mainContainer = mainContainer;
@@ -40,6 +47,7 @@ export class VFXManager {
     this.soundManager = soundManager;
 
     this.waterBg = waterBg;
+    this.cloudBackground = cloudBackground;
     this.lightningOverlay = new Graphics();
     this.setupLightningOverlay();
     this.starfield = starfield;
@@ -65,10 +73,11 @@ export class VFXManager {
     this.updateBlackHolePosition();
   }
 
-  private getSlotCenter(): { x: number; y: number; scale: number } {
+  private getSlotCenter(forcedIsFreeSpins?: boolean): { x: number; y: number; scale: number } {
     const screenWidth = getAppWidth();
     const screenHeight = getAppHeight();
     const isPortrait = screenHeight > screenWidth;
+    const deviceType = getDeviceType();
 
     const designWidth = isPortrait
       ? CONFIG.DESIGN_WIDTH_PORTRAIT
@@ -76,9 +85,25 @@ export class VFXManager {
     const designHeight = isPortrait
       ? CONFIG.DESIGN_HEIGHT_PORTRAIT
       : CONFIG.DESIGN_HEIGHT_LANDSCAPE;
-    const machineScale = isPortrait
+    
+    let machineScale = isPortrait
       ? CONFIG.MACHINE_SCALE_PORTRAIT
       : CONFIG.MACHINE_SCALE_LANDSCAPE;
+
+    if (deviceType === DEVICE_TYPES.MOBILE) {
+      machineScale = isPortrait
+        ? CONFIG.MACHINE_SCALE_MOBILE_PORTRAIT
+        : CONFIG.MACHINE_SCALE_MOBILE_LANDSCAPE;
+    } else if (deviceType === DEVICE_TYPES.TABLET) {
+      machineScale = isPortrait
+        ? CONFIG.MACHINE_SCALE_TABLET_PORTRAIT
+        : CONFIG.MACHINE_SCALE_TABLET_LANDSCAPE;
+    } else {
+      machineScale = isPortrait
+        ? CONFIG.MACHINE_SCALE_DESKTOP_PORTRAIT
+        : CONFIG.MACHINE_SCALE_DESKTOP_LANDSCAPE;
+    }
+
     const slotOffX = isPortrait
       ? CONFIG.SLOT_OFFSET_X_PORTRAIT
       : CONFIG.SLOT_OFFSET_X_LANDSCAPE;
@@ -91,6 +116,15 @@ export class VFXManager {
       screenHeight / designHeight,
     );
     scale *= machineScale;
+
+    const isFStheme = forcedIsFreeSpins !== undefined ? forcedIsFreeSpins : this.isFreeSpinsTheme;
+
+    if (isFStheme) {
+      const freeSpinsMult = isPortrait
+        ? PORTRAIT.FREE_SPINS_SCALE_MULT
+        : LANDSCAPE.FREE_SPINS_SCALE_MULT;
+      scale *= freeSpinsMult;
+    }
 
     return {
       x: screenWidth / 2 + slotOffX * scale,
@@ -121,15 +155,17 @@ export class VFXManager {
     if (toFreeSpins) {
       if (this.waterBg) this.waterBg.setTheme(true);
       if (this.starfield) this.starfield.setTheme(true);
+      if (this.cloudBackground) this.cloudBackground.setTheme(true);
       if (!skipLightning) this.toggleFreeSpinEffects(true);
     } else {
       if (this.waterBg) this.waterBg.setTheme(false);
       if (this.starfield) this.starfield.setTheme(false);
+      if (this.cloudBackground) this.cloudBackground.setTheme(false);
       this.toggleFreeSpinEffects(false);
     }
   }
 
-  // vortex — use same position/scale as SlotMachine.handleResize so slot doesn’t snap to screen center
+  // vortex
   playBlackHoleTransition(
     _toFreeSpins: boolean,
     onSwapTextCall: () => void,
@@ -138,7 +174,7 @@ export class VFXManager {
     this.soundManager.playSFX("sfx_vortex");
     gsap.delayedCall(3.0, () => this.soundManager.playSFX("sfx_vortex"));
 
-    const { x: centerX, y: centerY, scale: targetScale } = this.getSlotCenter();
+    const { x: centerX, y: centerY, scale: targetScale } = this.getSlotCenter(_toFreeSpins);
     this.blackHole.x = centerX;
     this.blackHole.y = centerY;
     this.blackHole.scale.set(0);
@@ -312,13 +348,12 @@ export class VFXManager {
     const { x: centerX, y: centerY } = this.getSlotCenter();
 
     if (!this.isFreeSpinsTheme) {
-      // When not in free spins, always restore to the normal slot position (with offset)
       gsap.to(this.mainContainer, { x: centerX, y: centerY, duration: 0.1 });
       return;
     }
 
     //  intensity
-    const intensity = 7;
+    const intensity = 3;
 
     // X and Y around the offset slot center
     const randomX = centerX + (Math.random() * intensity * 2.5 - intensity);
@@ -327,7 +362,7 @@ export class VFXManager {
     gsap.to(this.mainContainer, {
       x: randomX,
       y: randomY,
-      duration: 0.03, // vibration speed
+      duration: 0.02, 
       ease: "none",
       onComplete: () => this.triggerRumble(),
     });

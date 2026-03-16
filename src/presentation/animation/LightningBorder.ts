@@ -1,6 +1,5 @@
 import { AnimatedSprite, Spritesheet, Assets } from "pixi.js";
 
-import gridImagePath from "../../assets/border.png";
 
 export class LightningBorder {
   public sprite!: AnimatedSprite;
@@ -8,11 +7,12 @@ export class LightningBorder {
 
   public async init() {
     try {
+      const gridImagePath = "freebroder.png";
       const frameWidth = 450;
-      const frameHeight = 256;
-      const columns = 13;
-      const rows = 13;
-      const totalFrames = 161;
+      const frameHeight = 253;
+      const columns = 10;
+      const rows = 9;
+      const totalFrames = 88;
 
       const framesData: any = {};
       const flashArray: string[] = [];
@@ -69,7 +69,7 @@ export class LightningBorder {
 
   public show() {
     if (!this.isLoaded) return;
-    this.sprite.alpha = 1;
+    this.sprite.alpha = 100;
     this.sprite.play();
   }
 

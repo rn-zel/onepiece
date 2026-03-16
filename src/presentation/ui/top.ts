@@ -108,7 +108,7 @@ export class TopUI {
     g.scale.set(3.0, 1.2);
     
     const blur = new BlurFilter();
-    blur.blur = 80;
+    blur.strength = 80;
     g.filters = [blur];
     
     g.blendMode = "add";
