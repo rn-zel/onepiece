@@ -16,7 +16,7 @@ import { CloudBackground } from "./presentation/animation/CloudBackground";
 import {
   setAuthToken,
   setSlotApiBaseUrl,
-  endSession,
+  endSessionOnClose,
 } from "./infrastructure/api/slotApi";
 
 (async () => {
@@ -80,7 +80,7 @@ import {
 
     // End the backend session when the game page is being closed or refreshed.
     window.addEventListener("pagehide", () => {
-      void endSession();
+      endSessionOnClose();
     });
   } catch (error) {
     console.error("Error starting game:", error);

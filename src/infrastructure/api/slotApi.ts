@@ -117,7 +117,7 @@ type SessionInfo = {
   started_at: string;
 };
 
-let apiBaseUrl = "http://blitzgamingbackoffice.test/api/v1";
+let apiBaseUrl = "http://192.168.150.139:8000/api/v1";
 let authToken: string | null = null;
 let currentSessionId: string | null = null;
 let roundCounter = 0;
@@ -224,6 +224,36 @@ export async function endSession(): Promise<void> {
       currentSessionId = null;
     }
   }
+}
+
+/**
+ * Best-effort end-session for page close.
+ *
+ * Uses `keepalive` and does not await the request because browsers may terminate
+ * async work during tab close / navigation.
+ */
+export function endSessionOnClose(): void {
+  if (!currentSessionId || !authToken) return;
+
+  const sessionId = currentSessionId;
+  currentSessionId = null;
+
+  const url = `${apiBaseUrl}/session/end`;
+
+  // Fire-and-forget: keepalive increases chance it reaches the server.
+  // Do not await; failures are expected and handled by server-side timeouts (if enabled later).
+  void fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${authToken}`,
+    },
+    body: JSON.stringify({ session_id: sessionId }),
+    keepalive: true,
+  }).catch(() => {
+    // Ignore - tab close requests are not guaranteed to complete.
+  });
 }
 
 /** POST /load – get initial balance, free spin count, jackpot prizes. */
